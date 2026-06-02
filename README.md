@@ -63,20 +63,65 @@ The seed script creates:
 - Categories: Grocery, Medicines, Fruits & Vegetables, Bakery, Stationery
 - Admin/Super Admin user from `ADMIN_PHONE` and `ADMIN_EMAIL`
 
-## Current Phase 1 Endpoints
+## API Endpoints
 
-- `POST /api/v1/auth/otp/request`
-- `POST /api/v1/auth/otp/verify`
+- `POST /api/v1/auth/request-otp`
+- `POST /api/v1/auth/verify-otp`
+- `POST /api/v1/auth/refresh-token`
+- `GET /api/v1/auth/me`
 - `GET/PATCH /api/v1/users/me`
+- `GET /api/v1/users`
+- `GET /api/v1/users/:id`
+- `PATCH /api/v1/users/:id`
 - `GET /api/v1/cities`
+- `GET /api/v1/cities/:id/zones`
+- `POST/PATCH/DELETE /api/v1/cities`
 - `GET /api/v1/zones`
+- `POST/PATCH/DELETE /api/v1/zones`
 - `GET/POST /api/v1/addresses`
-- `GET/POST /api/v1/shops`
+- `GET /api/v1/categories`
+- `GET /api/v1/categories/:id`
+- `POST/PATCH/DELETE /api/v1/categories`
+- `GET /api/v1/shops`
+- `GET /api/v1/shops/:id`
+- `POST /api/v1/shops/register`
+- `GET/PATCH /api/v1/shops/my-shop`
+- `PATCH /api/v1/shops/my-shop/status`
 - `PATCH /api/v1/shops/:id/status`
-- `GET/POST /api/v1/products`
-- `GET/POST /api/v1/orders`
-- `GET/POST /api/v1/item-requests`
+- `GET /api/v1/products`
+- `GET /api/v1/products/:id`
+- `POST /api/v1/products`
+- `GET /api/v1/products/my-products`
+- `PATCH/DELETE /api/v1/products/:id`
+- `PATCH /api/v1/products/:id/stock`
+- `POST /api/v1/orders`
+- `GET /api/v1/orders/my-orders`
+- `GET /api/v1/orders/:id`
+- `PATCH /api/v1/orders/:id/cancel`
+- `GET /api/v1/shop/orders`
+- `PATCH /api/v1/shop/orders/:id/accept`
+- `PATCH /api/v1/shop/orders/:id/reject`
+- `PATCH /api/v1/shop/orders/:id/ready`
+- `GET /api/v1/rider/orders/available`
+- `PATCH /api/v1/rider/orders/:id/accept`
+- `PATCH /api/v1/rider/orders/:id/pickup`
+- `PATCH /api/v1/rider/orders/:id/deliver`
+- `GET /api/v1/admin/orders`
+- `GET /api/v1/admin/orders/:id`
+- `POST /api/v1/item-requests`
+- `GET /api/v1/item-requests/my-requests`
+- `GET /api/v1/item-requests/:id`
+- `GET /api/v1/shop/item-requests/nearby`
+- `POST /api/v1/shop/item-requests/:id/quotes`
+- `PATCH /api/v1/shop/item-requests/quotes/:quoteId`
+- `PATCH /api/v1/item-requests/quotes/:quoteId/accept`
 - Admin skeleton routes under `/api/v1/admin`
+- `GET /api/v1/admin/shops`
+- `PATCH /api/v1/admin/shops/:id/approve`
+- `PATCH /api/v1/admin/shops/:id/reject`
+- `PATCH /api/v1/admin/shops/:id/suspend`
+- `GET /api/v1/admin/dashboard/summary`
+- `PATCH /api/v1/delivery/rider/availability`
 - `GET /health`
 
 ## Security Notes
@@ -88,6 +133,8 @@ The seed script creates:
 - JWT access-token expiry is controlled by `JWT_EXPIRES_IN`.
 - Refresh tokens are issued as a placeholder response. A later phase should persist hashed refresh tokens with rotation, device metadata, and revoke-at timestamps.
 - Keep `JWT_SECRET` and `JWT_REFRESH_SECRET` different in production.
+- List endpoints use a common response shape with `success`, `message`, `data`, and paginated `meta` where applicable.
+- Order creation uses a Prisma transaction and reserves stock immediately when the order is created. If the customer cancels or the shop rejects before fulfillment, stock is restored.
 
 ## Notes
 
@@ -97,3 +144,4 @@ The seed script creates:
 - Shop/category-specific commission overrides are represented by `ShopCategoryCommission`.
 - Rider availability is indexed by city/zone/status for assignment flow readiness.
 - Request Any Item now supports a quote workflow table through `ItemRequestQuote` and `QuoteStatus`.
+- Accepted Request Any Item quotes currently return an explicit TODO for conversion into a custom order. That conversion needs a custom item/order pricing workflow in the next phase.

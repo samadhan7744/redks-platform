@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,6 +7,9 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { CreateShopDto } from './dto/create-shop.dto';
+import { ShopQueryDto } from './dto/shop-query.dto';
+import { UpdateMyShopStatusDto } from './dto/update-my-shop-status.dto';
+import { UpdateShopDto } from './dto/update-shop.dto';
 import { UpdateShopStatusDto } from './dto/update-shop-status.dto';
 import { ShopsService } from './shops.service';
 
@@ -16,21 +19,45 @@ export class ShopsController {
   constructor(private readonly shopsService: ShopsService) {}
 
   @Get()
-  findApproved() {
-    return this.shopsService.findApproved();
+  findApproved(@Query() query: ShopQueryDto) {
+    return this.shopsService.findPublic(query);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.shopsService.findById(id);
-  }
-
-  @Post()
+  @Post('register')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER, UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateShopDto) {
     return this.shopsService.create(user.sub, dto);
+  }
+
+  @Get('my-shop')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  myShop(@CurrentUser() user: AuthUser) {
+    return this.shopsService.findMyShop(user.sub);
+  }
+
+  @Patch('my-shop')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  updateMyShop(@CurrentUser() user: AuthUser, @Body() dto: UpdateShopDto) {
+    return this.shopsService.updateMyShop(user.sub, dto);
+  }
+
+  @Patch('my-shop/status')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  updateMyStatus(@CurrentUser() user: AuthUser, @Body() dto: UpdateMyShopStatusDto) {
+    return this.shopsService.updateMyStatus(user.sub, dto);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.shopsService.findById(id);
   }
 
   @Patch(':id/status')

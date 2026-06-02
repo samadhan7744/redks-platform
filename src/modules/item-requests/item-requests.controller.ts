@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -22,9 +22,20 @@ export class ItemRequestsController {
     return this.itemRequestsService.create(user.sub, dto);
   }
 
-  @Get('mine')
+  @Get('my-requests')
   mine(@CurrentUser() user: AuthUser) {
     return this.itemRequestsService.findForCustomer(user.sub);
+  }
+
+  @Patch('quotes/:quoteId/accept')
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  acceptQuote(@CurrentUser() user: AuthUser, @Param('quoteId') quoteId: string) {
+    return this.itemRequestsService.acceptQuote(user, quoteId);
+  }
+
+  @Get(':id')
+  findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.itemRequestsService.findForActor(user, id);
   }
 
   @Get()
