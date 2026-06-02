@@ -22,14 +22,43 @@ Phase 1 is the backend foundation for a hyperlocal commerce and delivery platfor
 
 ## Setup
 
-```bash
+PowerShell:
+
+```powershell
 npm install
 copy .env.example .env
 docker compose up -d
-npm run prisma:generate
-npm run prisma:migrate -- --name init
+npx prisma generate
+npx prisma migrate dev --name phase-3-core-apis
 npm run prisma:seed
 npm run start:dev
+```
+
+Before running migrations, make sure `.env` exists and contains:
+
+```text
+DATABASE_URL=postgresql://redks:redks_password@localhost:5432/redks?schema=public
+```
+
+The Docker Compose PostgreSQL service uses the same credentials:
+
+```text
+POSTGRES_USER=redks
+POSTGRES_PASSWORD=redks_password
+POSTGRES_DB=redks
+published port=5432
+```
+
+If migrations fail because Postgres is still starting, wait until the container is healthy:
+
+```powershell
+docker inspect redks-postgres --format "{{json .State.Health.Status}}"
+```
+
+Then rerun:
+
+```powershell
+npx prisma migrate dev --name phase-3-core-apis
 ```
 
 API docs:
