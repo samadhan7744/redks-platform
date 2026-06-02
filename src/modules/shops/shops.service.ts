@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Role, ShopStatus } from '@prisma/client';
+import { ShopStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { UpdateShopStatusDto } from './dto/update-shop-status.dto';
@@ -38,7 +38,7 @@ export class ShopsService {
     const slug = this.slugify(dto.name);
 
     const owner = await this.prisma.user.findUniqueOrThrow({ where: { id: ownerId } });
-    const roles = Array.from(new Set([...owner.roles, Role.SHOP_OWNER]));
+    const roles = Array.from(new Set([...owner.roles, UserRole.SHOP_OWNER]));
 
     await this.prisma.user.update({
       where: { id: ownerId },

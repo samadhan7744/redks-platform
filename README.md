@@ -11,6 +11,8 @@ Phase 1 is the backend foundation for a hyperlocal commerce and delivery platfor
 - `src/common` contains shared auth/RBAC decorators and guards.
 - `src/prisma` and `src/redis` provide global infrastructure services.
 - Swagger runs at `/api/docs`; API routes are prefixed with `/api/v1`.
+- Health check runs outside the API prefix at `GET /health`.
+- Global exception handling and request logging are enabled for operational visibility.
 
 ## Requirements
 
@@ -43,8 +45,11 @@ DATABASE_URL=postgresql://redks:redks_password@localhost:5432/redks?schema=publi
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=change-me-in-production
 JWT_EXPIRES_IN=7d
+JWT_REFRESH_SECRET=change-me-refresh-in-production
+JWT_REFRESH_EXPIRES_IN=30d
 OTP_TTL_SECONDS=300
 OTP_DEV_CODE=123456
+OTP_MAX_ATTEMPTS=5
 ADMIN_PHONE=9999999999
 ADMIN_EMAIL=admin@redks.in
 ```
@@ -72,6 +77,17 @@ The seed script creates:
 - `GET/POST /api/v1/orders`
 - `GET/POST /api/v1/item-requests`
 - Admin skeleton routes under `/api/v1/admin`
+- `GET /health`
+
+## Security Notes
+
+- OTPs are stored in Redis as hashes using the phone number and server secret.
+- OTP records expire through `OTP_TTL_SECONDS`.
+- Verification attempts are limited with `OTP_MAX_ATTEMPTS` for the same OTP lifetime.
+- Development can expose `devOtp`; production generates a random 6-digit OTP and should send it through an SMS provider.
+- JWT access-token expiry is controlled by `JWT_EXPIRES_IN`.
+- Refresh tokens are issued as a placeholder response. A later phase should persist hashed refresh tokens with rotation, device metadata, and revoke-at timestamps.
+- Keep `JWT_SECRET` and `JWT_REFRESH_SECRET` different in production.
 
 ## Notes
 
@@ -79,3 +95,5 @@ The seed script creates:
 - Online payments are modeled but provider integration is intentionally deferred.
 - Shop and rider approvals are modeled and exposed through admin skeleton routes.
 - Shop/category-specific commission overrides are represented by `ShopCategoryCommission`.
+- Rider availability is indexed by city/zone/status for assignment flow readiness.
+- Request Any Item now supports a quote workflow table through `ItemRequestQuote` and `QuoteStatus`.

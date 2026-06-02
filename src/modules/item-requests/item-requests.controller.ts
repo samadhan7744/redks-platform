@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,7 +17,7 @@ export class ItemRequestsController {
   constructor(private readonly itemRequestsService: ItemRequestsService) {}
 
   @Post()
-  @Roles(Role.CUSTOMER, Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateItemRequestDto) {
     return this.itemRequestsService.create(user.sub, dto);
   }
@@ -28,7 +28,7 @@ export class ItemRequestsController {
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   findAll() {
     return this.itemRequestsService.findAll();
   }

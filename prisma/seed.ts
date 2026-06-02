@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -82,14 +82,14 @@ async function main() {
     update: {
       email: adminEmail,
       name: 'RedKS Admin',
-      roles: [Role.ADMIN, Role.SUPER_ADMIN],
+      roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
       status: 'ACTIVE',
     },
     create: {
       phone: adminPhone,
       email: adminEmail,
       name: 'RedKS Admin',
-      roles: [Role.ADMIN, Role.SUPER_ADMIN],
+      roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
       status: 'ACTIVE',
     },
   });

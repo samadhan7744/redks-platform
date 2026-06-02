@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
+enum UserRole {
   CUSTOMER
   SHOP_OWNER
   RIDER
@@ -24,6 +24,7 @@ enum UserStatus {
 enum ShopStatus {
   DRAFT
   PENDING_APPROVAL
+  UNDER_REVIEW
   APPROVED
   REJECTED
   SUSPENDED
@@ -52,17 +53,24 @@ enum ProductStatus {
   ACTIVE
   INACTIVE
   OUT_OF_STOCK
+  DELETED
 }
 
 enum OrderStatus {
   PLACED
+  CONFIRMED
   ACCEPTED
+  REJECTED
+  PACKING
   PACKED
+  READY_FOR_PICKUP
   ASSIGNED
   PICKED_UP
+  OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
-  REJECTED
+  REFUND_INITIATED
+  REFUNDED
 }
 
 enum PaymentMethod {
@@ -72,25 +80,52 @@ enum PaymentMethod {
 
 enum PaymentStatus {
   PENDING
+  INITIATED
+  AUTHORIZED
   PAID
   FAILED
+  REFUND_PENDING
   REFUNDED
+  COD_PENDING
+  COD_COLLECTED
 }
 
 enum DeliveryStatus {
   PENDING
+  SEARCHING_RIDER
   ASSIGNED
+  ARRIVED_AT_SHOP
   PICKED_UP
+  IN_TRANSIT
+  ARRIVED_AT_CUSTOMER
   DELIVERED
   FAILED
   CANCELLED
+  RETURNED
 }
 
-enum RequestStatus {
+enum RiderAvailabilityStatus {
+  OFFLINE
+  AVAILABLE
+  BUSY
+  ON_DELIVERY
+}
+
+enum ItemRequestStatus {
   OPEN
-  QUOTED
+  IN_REVIEW
   ACCEPTED
+  QUOTED
   FULFILLED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
   CANCELLED
 }
 
@@ -99,7 +134,7 @@ model User {
   phone          String           @unique
   email          String?          @unique
   name           String?
-  roles          Role[]           @default([CUSTOMER])
+  roles          UserRole[]       @default([CUSTOMER])
   status         UserStatus       @default(ACTIVE)
   lastLoginAt    DateTime?
   createdAt      DateTime         @default(now())
@@ -113,6 +148,9 @@ model User {
   notifications  Notification[]
   approvedShops  Shop[]           @relation("ShopApprovedBy")
   approvedRiders RiderProfile[]   @relation("RiderApprovedBy")
+
+  @@index([phone])
+  @@index([status])
 }
 
 model Address {
@@ -141,18 +179,18 @@ model Address {
 }
 
 model City {
-  id          String    @id @default(cuid())
-  name        String
-  state       String
-  slug        String    @unique
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  zones       Zone[]
-  addresses   Address[]
-  shops       Shop[]
+  id            String         @id @default(cuid())
+  name          String
+  state         String
+  slug          String         @unique
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  zones         Zone[]
+  addresses     Address[]
+  shops         Shop[]
   riderProfiles RiderProfile[]
-  requests    ItemRequest[]
+  requests      ItemRequest[]
 
   @@unique([name, state])
 }
@@ -177,6 +215,7 @@ model Zone {
 
   @@unique([cityId, slug])
   @@index([cityId])
+  @@index([cityId, isActive])
 }
 
 model Shop {
@@ -216,11 +255,14 @@ model Shop {
   orders                     Order[]
   reviews                    Review[]
   itemRequests               ItemRequest[]
+  itemRequestQuotes          ItemRequestQuote[]
 
   @@unique([cityId, slug])
   @@index([ownerId])
   @@index([cityId, zoneId])
   @@index([status])
+  @@index([cityId, zoneId, status])
+  @@index([deliveryMode, status])
 }
 
 model Category {
@@ -237,6 +279,9 @@ model Category {
   products                  Product[]
   shops                     ShopCategory[]
   shopCommissions           ShopCategoryCommission[]
+
+  @@index([parentId])
+  @@index([isActive])
 }
 
 model ShopCategory {
@@ -260,6 +305,7 @@ model ShopCategoryCommission {
   category            Category  @relation(fields: [categoryId], references: [id])
 
   @@unique([shopId, categoryId])
+  @@index([categoryId])
 }
 
 model Product {
@@ -285,27 +331,38 @@ model Product {
   @@index([shopId])
   @@index([categoryId])
   @@index([status])
+  @@index([shopId, categoryId, status])
+  @@index([shopId, status])
 }
 
 model RiderProfile {
-  id                 String        @id @default(cuid())
-  userId             String        @unique
+  id                 String                   @id @default(cuid())
+  userId             String                   @unique
   cityId             String
   zoneId             String?
-  status             RiderStatus   @default(PENDING_APPROVAL)
+  status             RiderStatus              @default(PENDING_APPROVAL)
+  availabilityStatus RiderAvailabilityStatus  @default(OFFLINE)
   vehicleType        String?
   vehicleNumber      String?
   drivingLicenseUrl  String?
+  currentLatitude    Decimal?                 @db.Decimal(10, 7)
+  currentLongitude   Decimal?                 @db.Decimal(10, 7)
+  lastAvailableAt    DateTime?
   approvedById       String?
   approvedAt         DateTime?
   rejectionReason    String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  user               User          @relation(fields: [userId], references: [id])
-  city               City          @relation(fields: [cityId], references: [id])
-  zone               Zone?         @relation(fields: [zoneId], references: [id])
-  approvedBy         User?         @relation("RiderApprovedBy", fields: [approvedById], references: [id])
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  user               User                     @relation(fields: [userId], references: [id])
+  city               City                     @relation(fields: [cityId], references: [id])
+  zone               Zone?                    @relation(fields: [zoneId], references: [id])
+  approvedBy         User?                    @relation("RiderApprovedBy", fields: [approvedById], references: [id])
   deliveries         Delivery[]
+  assignedOrders     Order[]                  @relation("AssignedRiderOrders")
+
+  @@index([cityId, zoneId, status])
+  @@index([availabilityStatus, zoneId])
+  @@index([status, availabilityStatus])
 }
 
 model Order {
@@ -313,6 +370,7 @@ model Order {
   orderNumber         String         @unique
   customerId          String
   shopId              String
+  riderId             String?
   addressId           String
   status              OrderStatus    @default(PLACED)
   paymentMethod       PaymentMethod  @default(COD)
@@ -331,6 +389,7 @@ model Order {
   updatedAt           DateTime       @updatedAt
   customer            User           @relation("CustomerOrders", fields: [customerId], references: [id])
   shop                Shop           @relation(fields: [shopId], references: [id])
+  rider               RiderProfile?  @relation("AssignedRiderOrders", fields: [riderId], references: [id])
   address             Address        @relation(fields: [addressId], references: [id])
   items               OrderItem[]
   delivery            Delivery?
@@ -339,8 +398,13 @@ model Order {
 
   @@index([customerId])
   @@index([shopId])
+  @@index([riderId])
   @@index([status])
   @@index([placedAt])
+  @@index([customerId, status])
+  @@index([shopId, status])
+  @@index([riderId, status])
+  @@index([shopId, riderId, status])
 }
 
 model OrderItem {
@@ -375,6 +439,8 @@ model Delivery {
 
   @@index([riderId])
   @@index([status])
+  @@index([riderId, status])
+  @@index([status, createdAt])
 }
 
 model Payment {
@@ -388,6 +454,10 @@ model Payment {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   order             Order          @relation(fields: [orderId], references: [id])
+
+  @@index([status])
+  @@index([method, status])
+  @@index([providerPaymentId])
 }
 
 model Notification {
@@ -427,7 +497,7 @@ model ItemRequest {
   zoneId       String?
   shopId       String?
   description  String
-  status       RequestStatus @default(OPEN)
+  status       ItemRequestStatus @default(OPEN)
   quotedAmount Decimal?      @db.Decimal(10, 2)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -435,8 +505,30 @@ model ItemRequest {
   city         City          @relation(fields: [cityId], references: [id])
   zone         Zone?         @relation(fields: [zoneId], references: [id])
   shop         Shop?         @relation(fields: [shopId], references: [id])
+  quotes       ItemRequestQuote[]
 
   @@index([customerId])
   @@index([cityId, zoneId])
   @@index([status])
+  @@index([shopId, status])
+  @@index([cityId, zoneId, status])
+}
+
+model ItemRequestQuote {
+  id            String       @id @default(cuid())
+  itemRequestId String
+  shopId        String?
+  status        QuoteStatus  @default(DRAFT)
+  amount        Decimal      @db.Decimal(10, 2)
+  note          String?
+  expiresAt     DateTime?
+  acceptedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  itemRequest   ItemRequest  @relation(fields: [itemRequestId], references: [id])
+  shop          Shop?        @relation(fields: [shopId], references: [id])
+
+  @@index([itemRequestId, status])
+  @@index([shopId, status])
+  @@index([expiresAt])
 }

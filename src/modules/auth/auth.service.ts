@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { Role } from '@prisma/client';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
+import { UserRole } from '@prisma/client';
+import { createHash, randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
@@ -17,10 +18,14 @@ export class AuthService {
   ) {}
 
   async requestOtp(dto: RequestOtpDto) {
-    const otp = this.configService.get<string>('OTP_DEV_CODE', '123456');
+    const otp =
+      this.configService.get('NODE_ENV') === 'production'
+        ? randomInt(100000, 999999).toString()
+        : this.configService.get<string>('OTP_DEV_CODE', '123456');
     const ttlSeconds = this.configService.get<number>('OTP_TTL_SECONDS', 300);
 
-    await this.redis.setOtp(dto.phone, otp, ttlSeconds);
+    await this.redis.setOtp(dto.phone, this.hashOtp(dto.phone, otp), ttlSeconds);
+    await this.redis.resetOtpAttempts(dto.phone, ttlSeconds);
 
     return {
       message: 'OTP generated. SMS provider integration will be added in a later phase.',
@@ -30,9 +35,17 @@ export class AuthService {
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
+    const ttlSeconds = this.configService.get<number>('OTP_TTL_SECONDS', 300);
+    const maxAttempts = this.configService.get<number>('OTP_MAX_ATTEMPTS', 5);
+    const attempts = await this.redis.incrementOtpAttempts(dto.phone, ttlSeconds);
+
+    if (attempts > maxAttempts) {
+      throw new HttpException('Too many OTP verification attempts', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     const expectedOtp = await this.redis.getOtp(dto.phone);
 
-    if (!expectedOtp || expectedOtp !== dto.otp) {
+    if (!expectedOtp || expectedOtp !== this.hashOtp(dto.phone, dto.otp)) {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
@@ -41,7 +54,7 @@ export class AuthService {
       update: { lastLoginAt: new Date(), status: 'ACTIVE' },
       create: {
         phone: dto.phone,
-        roles: [Role.CUSTOMER],
+        roles: [UserRole.CUSTOMER],
         status: 'ACTIVE',
         lastLoginAt: new Date(),
       },
@@ -49,15 +62,31 @@ export class AuthService {
 
     await this.redis.deleteOtp(dto.phone);
 
-    const accessToken = await this.jwtService.signAsync({
+    const payload = {
       sub: user.id,
       phone: user.phone,
       roles: user.roles,
-    });
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload);
+    const refreshToken = await this.jwtService.signAsync(
+      { ...payload, tokenType: 'refresh' },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
+        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d') as JwtSignOptions['expiresIn'],
+      },
+    );
 
     return {
       accessToken,
+      refreshToken,
+      refreshTokenPlaceholder: 'Persist hashed refresh tokens and rotation metadata in a later auth phase.',
       user,
     };
+  }
+
+  private hashOtp(phone: string, otp: string) {
+    const secret = this.configService.get<string>('JWT_SECRET', 'dev-secret');
+    return createHash('sha256').update(`${phone}:${otp}:${secret}`).digest('hex');
   }
 }
