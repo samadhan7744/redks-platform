@@ -322,3 +322,212 @@ flutter analyze
 flutter test
 flutter build apk --debug
 ```
+
+## Free Cloud Deployment Guide
+
+This section prepares RedKS for a simple free-tier deployment:
+
+- Code: GitHub
+- Backend: Render Web Service using the root `Dockerfile`
+- Database: Supabase PostgreSQL
+- Redis: Render Redis or Upstash Redis
+- Admin Panel: Vercel
+- Mobile apps: Flutter APKs built with the cloud API URL
+
+### GitHub Push Checklist
+
+Before the first push:
+
+```powershell
+cd D:\RedKS
+git status --short
+npm run build
+npm test
+cd D:\RedKS\apps\admin
+npm run build
+cd D:\RedKS\apps\customer
+flutter analyze
+cd D:\RedKS\apps\partner
+flutter analyze
+```
+
+Confirm these are not committed:
+
+- `.env`
+- `.env.local`
+- `apps/admin/.env.local`
+- `node_modules`
+- `dist`
+- `.next`
+- Flutter `build` and `.dart_tool` folders
+- APK files unless you intentionally attach them to a release
+
+Recommended first push:
+
+```powershell
+cd D:\RedKS
+git init
+git add .
+git commit -m "Prepare RedKS MVP for cloud deployment"
+git branch -M main
+git remote add origin https://github.com/<your-org-or-user>/redks.git
+git push -u origin main
+```
+
+### Supabase PostgreSQL
+
+1. Create a free Supabase project.
+2. Go to Project Settings > Database.
+3. Copy the pooled connection string for Prisma/serverless-friendly usage when available.
+4. Use a URL shaped like:
+
+```text
+postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&schema=public
+```
+
+For direct connections, Supabase may show port `5432` instead of `6543`. Use the connection string Supabase gives you for your project.
+
+Run migrations from your local machine against Supabase:
+
+```powershell
+cd D:\RedKS
+$env:DATABASE_URL="your-supabase-database-url"
+npx prisma migrate deploy
+npm run prisma:seed
+```
+
+Do not commit the Supabase URL. Store it only in Render environment variables or your local shell.
+
+### Redis
+
+Use either Render Redis or Upstash.
+
+Render Redis URL usually looks like:
+
+```text
+redis://default:<password>@<host>:<port>
+```
+
+Upstash Redis URL usually looks like:
+
+```text
+rediss://default:<password>@<host>:<port>
+```
+
+Set this as `REDIS_URL` on Render.
+
+### Render Backend Deployment
+
+Create a Render Web Service:
+
+- Source: GitHub repo
+- Environment: Docker
+- Root directory: repository root
+- Dockerfile path: `Dockerfile`
+- Health check path: `/health`
+
+Render environment variables:
+
+```text
+NODE_ENV=production
+PORT=3000
+DATABASE_URL=<supabase-postgres-url>
+REDIS_URL=<render-redis-or-upstash-url>
+CORS_ORIGINS=https://your-admin.vercel.app
+JWT_SECRET=<long-random-secret>
+JWT_EXPIRES_IN=7d
+JWT_REFRESH_SECRET=<different-long-random-secret>
+JWT_REFRESH_EXPIRES_IN=30d
+OTP_TTL_SECONDS=300
+OTP_MAX_ATTEMPTS=5
+ADMIN_PHONE=9999999999
+ADMIN_EMAIL=admin@redks.in
+```
+
+For temporary demo deployments only, you may set:
+
+```text
+OTP_DEV_CODE=123456
+```
+
+For production, omit `OTP_DEV_CODE` and integrate an SMS provider before real users.
+
+After the first deploy, run migrations from your local machine with the Supabase `DATABASE_URL`, or use a one-off Render shell job if available:
+
+```powershell
+npx prisma migrate deploy
+npm run prisma:seed
+```
+
+Backend URLs after deployment:
+
+```text
+https://your-redks-backend.onrender.com/health
+https://your-redks-backend.onrender.com/api/v1
+https://your-redks-backend.onrender.com/api/docs
+```
+
+### Vercel Admin Deployment
+
+1. Import the GitHub repo in Vercel.
+2. Set project root directory to:
+
+```text
+apps/admin
+```
+
+3. Add environment variable:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=https://your-redks-backend.onrender.com/api/v1
+```
+
+4. Use default Next.js settings:
+
+```text
+Install Command: npm install
+Build Command: npm run build
+Output Directory: .next
+```
+
+5. Add the deployed Vercel URL to backend `CORS_ORIGINS` on Render.
+
+If you use preview deployments, include each preview origin in `CORS_ORIGINS`, separated by commas.
+
+### Flutter Cloud API Builds
+
+Customer APK with cloud backend:
+
+```powershell
+cd D:\RedKS\apps\customer
+flutter pub get
+flutter build apk --release --dart-define=REDKS_API_BASE_URL=https://your-redks-backend.onrender.com/api/v1
+```
+
+Partner APK with cloud backend:
+
+```powershell
+cd D:\RedKS\apps\partner
+flutter pub get
+flutter build apk --release --dart-define=REDKS_API_BASE_URL=https://your-redks-backend.onrender.com/api/v1
+```
+
+Debug APKs for testing:
+
+```powershell
+cd D:\RedKS\apps\customer
+flutter build apk --debug --dart-define=REDKS_API_BASE_URL=https://your-redks-backend.onrender.com/api/v1
+
+cd D:\RedKS\apps\partner
+flutter build apk --debug --dart-define=REDKS_API_BASE_URL=https://your-redks-backend.onrender.com/api/v1
+```
+
+### Production Notes
+
+- Use strong, unique JWT secrets in Render.
+- Keep Supabase and Redis credentials out of GitHub.
+- Restrict `CORS_ORIGINS` to real admin domains.
+- Free Render services may sleep; the first request after inactivity can be slow.
+- Supabase free tier may pause after inactivity depending on plan status.
+- Replace development OTP with SMS delivery before public launch.
+- Configure a custom domain only after the MVP flow is stable.

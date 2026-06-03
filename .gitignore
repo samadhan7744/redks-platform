@@ -1,6 +1,57 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+apps/admin/node_modules/
+
+# Backend build/test output
+dist/
+coverage/
+*.tsbuildinfo
+
+# Next.js
+apps/admin/.next/
+apps/admin/out/
+
+# Flutter/Dart
+apps/customer/.dart_tool/
+apps/customer/.flutter-plugins
+apps/customer/.flutter-plugins-dependencies
+apps/customer/build/
+apps/customer/coverage/
+apps/customer/.pub-cache/
+apps/partner/.dart_tool/
+apps/partner/.flutter-plugins
+apps/partner/.flutter-plugins-dependencies
+apps/partner/build/
+apps/partner/coverage/
+apps/partner/.pub-cache/
+
+# Environment files
 .env
-.env.local
-coverage
+.env.*
+!.env.example
+apps/admin/.env
+apps/admin/.env.*
+!apps/admin/.env.example
+apps/customer/.env
+apps/customer/.env.*
+apps/partner/.env
+apps/partner/.env.*
+
+# Logs and local tool output
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE/OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Local Docker/database artifacts
+*.sqlite
+*.db
+docker-data/

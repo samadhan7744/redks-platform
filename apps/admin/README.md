@@ -62,3 +62,21 @@ npm run start
 npm run build
 npm run lint
 ```
+
+## Vercel Deployment
+
+1. Import the GitHub repository in Vercel.
+2. Set the root directory to `apps/admin`.
+3. Add environment variable:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=https://your-render-backend.onrender.com/api/v1
+```
+
+4. Use the default Vercel Next.js build settings:
+
+```text
+Install Command: npm install
+Build Command: npm run build
+Output Directory: .next
+```
