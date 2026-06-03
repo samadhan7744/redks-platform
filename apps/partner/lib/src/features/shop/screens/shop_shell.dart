@@ -203,6 +203,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _address = TextEditingController();
+  final _pincode = TextEditingController();
   bool _loading = false;
   String? _error;
   String? _cityId;
@@ -215,6 +216,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     super.initState();
     _name.text = widget.existing?.name ?? '';
     _phone.text = widget.existing?.phone ?? '';
+    _pincode.text = '560001';
     _cityId = widget.existing?.city?.id;
     _zoneId = widget.existing?.zone?.id;
     _loadMeta();
@@ -225,6 +227,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     _name.dispose();
     _phone.dispose();
     _address.dispose();
+    _pincode.dispose();
     super.dispose();
   }
 
@@ -267,6 +270,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       'addressLine1': _address.text.trim().isEmpty
           ? 'Address pending'
           : _address.text.trim(),
+      'pincode': _pincode.text.trim(),
       if (_cityId != null) 'cityId': _cityId,
       if (_zoneId != null) 'zoneId': _zoneId,
     };
@@ -321,6 +325,19 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
               decoration: const InputDecoration(labelText: 'Address'),
               minLines: 2,
               maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _pincode,
+              decoration: const InputDecoration(labelText: 'Pincode'),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              validator: (value) => (value ?? '').trim().length == 6
+                  ? null
+                  : 'Enter a 6 digit pincode.',
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -495,18 +512,19 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       _loading = true;
       _error = null;
     });
-    final data = {
-      'name': _name.text.trim(),
-      'price': double.parse(_price.text.trim()),
-      'stock': int.parse(_stock.text.trim()),
-      'description': _description.text.trim().isEmpty
-          ? _name.text.trim()
-          : _description.text.trim(),
-      'status': _status,
-      if (_categoryId != null) 'categoryId': _categoryId,
-    };
     try {
       final repo = ref.read(partnerRepositoryProvider);
+      final data = {
+        if (widget.product == null) 'shopId': (await repo.myShop()).id,
+        'name': _name.text.trim(),
+        'price': double.parse(_price.text.trim()),
+        'stock': int.parse(_stock.text.trim()),
+        'description': _description.text.trim().isEmpty
+            ? _name.text.trim()
+            : _description.text.trim(),
+        'status': _status,
+        if (_categoryId != null) 'categoryId': _categoryId,
+      };
       if (widget.product == null) {
         await repo.createProduct(data);
       } else {
@@ -564,6 +582,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _categoryId = value),
+              validator: (value) => value == null ? 'Select category.' : null,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(

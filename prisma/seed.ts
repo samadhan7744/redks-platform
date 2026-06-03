@@ -1,4 +1,12 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import {
+  DeliveryMode,
+  ProductStatus,
+  RiderAvailabilityStatus,
+  RiderStatus,
+  ShopStatus,
+  PrismaClient,
+  UserRole,
+} from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -60,7 +68,11 @@ async function main() {
   const categories = [
     { name: 'Grocery', slug: 'grocery', defaultCommissionPercent: 8 },
     { name: 'Medicines', slug: 'medicines', defaultCommissionPercent: 10 },
-    { name: 'Fruits & Vegetables', slug: 'fruits-vegetables', defaultCommissionPercent: 7 },
+    {
+      name: 'Fruits & Vegetables',
+      slug: 'fruits-vegetables',
+      defaultCommissionPercent: 7,
+    },
     { name: 'Bakery', slug: 'bakery', defaultCommissionPercent: 9 },
     { name: 'Stationery', slug: 'stationery', defaultCommissionPercent: 11 },
   ];
@@ -93,6 +105,219 @@ async function main() {
       status: 'ACTIVE',
     },
   });
+
+  const bengaluru = await prisma.city.findUniqueOrThrow({
+    where: { slug: 'bengaluru' },
+  });
+  const indiranagar = await prisma.zone.findUniqueOrThrow({
+    where: { cityId_slug: { cityId: bengaluru.id, slug: 'indiranagar' } },
+  });
+  const grocery = await prisma.category.findUniqueOrThrow({
+    where: { slug: 'grocery' },
+  });
+  const bakery = await prisma.category.findUniqueOrThrow({
+    where: { slug: 'bakery' },
+  });
+
+  const customer = await prisma.user.upsert({
+    where: { phone: '9000000001' },
+    update: {
+      name: 'Demo Customer',
+      roles: [UserRole.CUSTOMER],
+      status: 'ACTIVE',
+    },
+    create: {
+      phone: '9000000001',
+      name: 'Demo Customer',
+      roles: [UserRole.CUSTOMER],
+      status: 'ACTIVE',
+    },
+  });
+
+  const shopOwner = await prisma.user.upsert({
+    where: { phone: '9000000002' },
+    update: {
+      name: 'Demo Shop Owner',
+      roles: [UserRole.CUSTOMER, UserRole.SHOP_OWNER],
+      status: 'ACTIVE',
+    },
+    create: {
+      phone: '9000000002',
+      name: 'Demo Shop Owner',
+      roles: [UserRole.CUSTOMER, UserRole.SHOP_OWNER],
+      status: 'ACTIVE',
+    },
+  });
+
+  const riderUser = await prisma.user.upsert({
+    where: { phone: '9000000003' },
+    update: {
+      name: 'Demo Rider',
+      roles: [UserRole.CUSTOMER, UserRole.RIDER],
+      status: 'ACTIVE',
+    },
+    create: {
+      phone: '9000000003',
+      name: 'Demo Rider',
+      roles: [UserRole.CUSTOMER, UserRole.RIDER],
+      status: 'ACTIVE',
+    },
+  });
+
+  const demoShop = await prisma.shop.upsert({
+    where: { cityId_slug: { cityId: bengaluru.id, slug: 'redks-demo-kirana' } },
+    update: {
+      ownerId: shopOwner.id,
+      zoneId: indiranagar.id,
+      status: ShopStatus.APPROVED,
+      deliveryMode: DeliveryMode.REDKS_DELIVERY,
+      approvedAt: new Date(),
+    },
+    create: {
+      ownerId: shopOwner.id,
+      cityId: bengaluru.id,
+      zoneId: indiranagar.id,
+      name: 'RedKS Demo Kirana',
+      slug: 'redks-demo-kirana',
+      description: 'Demo grocery shop for local MVP testing',
+      phone: '9000000002',
+      addressLine1: '12 RedKS Market Road',
+      pincode: '560038',
+      status: ShopStatus.APPROVED,
+      deliveryMode: DeliveryMode.REDKS_DELIVERY,
+      approvedAt: new Date(),
+    },
+  });
+
+  await prisma.shopCategory.upsert({
+    where: {
+      shopId_categoryId: { shopId: demoShop.id, categoryId: grocery.id },
+    },
+    update: {},
+    create: { shopId: demoShop.id, categoryId: grocery.id },
+  });
+
+  await prisma.shopCategory.upsert({
+    where: {
+      shopId_categoryId: { shopId: demoShop.id, categoryId: bakery.id },
+    },
+    update: {},
+    create: { shopId: demoShop.id, categoryId: bakery.id },
+  });
+
+  const demoProducts = [
+    {
+      name: 'Amul Taaza Milk 1L',
+      slug: 'amul-taaza-milk-1l',
+      categoryId: grocery.id,
+      price: 68,
+      mrp: 70,
+      stock: 40,
+      unit: 'litre',
+    },
+    {
+      name: 'Fresh Bread Loaf',
+      slug: 'fresh-bread-loaf',
+      categoryId: bakery.id,
+      price: 45,
+      mrp: 50,
+      stock: 25,
+      unit: 'piece',
+    },
+    {
+      name: 'Aashirvaad Atta 5kg',
+      slug: 'aashirvaad-atta-5kg',
+      categoryId: grocery.id,
+      price: 245,
+      mrp: 260,
+      stock: 18,
+      unit: 'pack',
+    },
+  ];
+
+  for (const product of demoProducts) {
+    await prisma.product.upsert({
+      where: { shopId_slug: { shopId: demoShop.id, slug: product.slug } },
+      update: {
+        name: product.name,
+        categoryId: product.categoryId,
+        price: product.price,
+        mrp: product.mrp,
+        stock: product.stock,
+        unit: product.unit,
+        status: ProductStatus.ACTIVE,
+      },
+      create: {
+        shopId: demoShop.id,
+        categoryId: product.categoryId,
+        name: product.name,
+        slug: product.slug,
+        price: product.price,
+        mrp: product.mrp,
+        stock: product.stock,
+        unit: product.unit,
+        status: ProductStatus.ACTIVE,
+      },
+    });
+  }
+
+  const existingAddress = await prisma.address.findFirst({
+    where: { userId: customer.id, line1: '101 Demo Apartments' },
+  });
+  if (!existingAddress) {
+    await prisma.address.create({
+      data: {
+        userId: customer.id,
+        type: 'HOME',
+        line1: '101 Demo Apartments',
+        landmark: 'Near RedKS Market',
+        cityId: bengaluru.id,
+        zoneId: indiranagar.id,
+        pincode: '560038',
+        isDefault: true,
+      },
+    });
+  }
+
+  await prisma.riderProfile.upsert({
+    where: { userId: riderUser.id },
+    update: {
+      cityId: bengaluru.id,
+      zoneId: indiranagar.id,
+      status: RiderStatus.APPROVED,
+      availabilityStatus: RiderAvailabilityStatus.AVAILABLE,
+      vehicleType: 'BIKE',
+      vehicleNumber: 'KA01RK0001',
+      approvedAt: new Date(),
+    },
+    create: {
+      userId: riderUser.id,
+      cityId: bengaluru.id,
+      zoneId: indiranagar.id,
+      status: RiderStatus.APPROVED,
+      availabilityStatus: RiderAvailabilityStatus.AVAILABLE,
+      vehicleType: 'BIKE',
+      vehicleNumber: 'KA01RK0001',
+      approvedAt: new Date(),
+    },
+  });
+
+  const existingRequest = await prisma.itemRequest.findFirst({
+    where: {
+      customerId: customer.id,
+      description: 'Need a 2kg chocolate cake by 7 PM',
+    },
+  });
+  if (!existingRequest) {
+    await prisma.itemRequest.create({
+      data: {
+        customerId: customer.id,
+        cityId: bengaluru.id,
+        zoneId: indiranagar.id,
+        description: 'Need a 2kg chocolate cake by 7 PM',
+      },
+    });
+  }
 }
 
 main()

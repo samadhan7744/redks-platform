@@ -91,6 +91,11 @@ The seed script creates:
 - Zones for each city
 - Categories: Grocery, Medicines, Fruits & Vegetables, Bakery, Stationery
 - Admin/Super Admin user from `ADMIN_PHONE` and `ADMIN_EMAIL`
+- Demo customer: `9000000001`
+- Demo shop owner: `9000000002`
+- Demo rider with approved rider profile: `9000000003`
+- Approved demo shop in Bengaluru/Indiranagar with grocery and bakery products
+- Demo customer address and one Request Any Item record
 
 ## API Endpoints
 
@@ -177,3 +182,143 @@ The seed script creates:
 - Rider availability is indexed by city/zone/status for assignment flow readiness.
 - Request Any Item now supports a quote workflow table through `ItemRequestQuote` and `QuoteStatus`.
 - Accepted Request Any Item quotes currently return an explicit TODO for conversion into a custom order. That conversion needs a custom item/order pricing workflow in the next phase.
+
+## Full Local MVP Runbook
+
+Use this section to run the complete RedKS MVP locally across backend, admin, customer, and partner apps.
+
+### 1. Start Infrastructure
+
+Docker Desktop must be running before these commands.
+
+```powershell
+cd D:\RedKS
+docker compose up -d
+docker inspect redks-postgres --format "{{json .State.Health.Status}}"
+docker inspect redks-redis --format "{{json .State.Health.Status}}"
+```
+
+Expected health status for both services is `healthy`.
+
+### 2. Prepare Backend Database
+
+```powershell
+cd D:\RedKS
+npm install
+copy .env.example .env
+npx prisma generate
+npx prisma migrate dev --name phase-3-core-apis
+npm run prisma:seed
+npm run start:dev
+```
+
+Backend URLs:
+
+- API: `http://localhost:3000/api/v1`
+- Swagger: `http://localhost:3000/api/docs`
+- Health: `http://localhost:3000/health`
+
+### 3. Run Admin Panel
+
+```powershell
+cd D:\RedKS\apps\admin
+npm install
+npm run dev
+```
+
+Admin URL: `http://localhost:3001` if port 3000 is already used by the backend. If Next picks another port, use the URL printed in the terminal.
+
+Set `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api/v1` in `D:\RedKS\apps\admin\.env.local` when needed.
+
+### 4. Build Mobile Apps
+
+Customer:
+
+```powershell
+cd D:\RedKS\apps\customer
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+Customer APK:
+
+```text
+D:\RedKS\apps\customer\build\app\outputs\flutter-apk\app-debug.apk
+```
+
+Partner:
+
+```powershell
+cd D:\RedKS\apps\partner
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
+```
+
+Partner APK:
+
+```text
+D:\RedKS\apps\partner\build\app\outputs\flutter-apk\app-debug.apk
+```
+
+Android emulator backend URL defaults to:
+
+```text
+http://10.0.2.2:3000/api/v1
+```
+
+Override if needed:
+
+```powershell
+flutter run --dart-define=REDKS_API_BASE_URL=http://10.0.2.2:3000/api/v1
+```
+
+### Demo Login Guide
+
+Development OTP is controlled by `OTP_DEV_CODE` and defaults to:
+
+```text
+123456
+```
+
+Demo phones:
+
+- Admin: `9999999999`
+- Customer: `9000000001`
+- Shop owner: `9000000002`
+- Rider: `9000000003`
+
+### MVP Test Flow
+
+1. Admin logs in with `9999999999`, verifies dashboard data, cities, zones, categories, demo shop, products, rider, and item requests.
+2. Shop owner logs into Partner App with `9000000002`, chooses Shop Mode, verifies `RedKS Demo Kirana`, adds or edits products, updates stock, accepts an incoming order, and marks it ready.
+3. Customer logs into Customer App with `9000000001`, selects Bengaluru and Indiranagar, browses the demo shop/products, adds products to cart, places a COD order, views the order, and cancels while status allows it.
+4. Rider logs into Partner App with `9000000003`, chooses Rider Mode, goes online, accepts ready orders in the same zone, marks pickup, and marks delivered.
+5. Customer creates a Request Any Item. Shop owner sees it under nearby requests and sends a quote. Customer accepts the quote. Custom order conversion remains a documented TODO.
+
+### Validation Commands
+
+Run these before a local MVP handoff:
+
+```powershell
+cd D:\RedKS
+npm run build
+npm test
+
+cd D:\RedKS\apps\admin
+npm run build
+npm run lint
+
+cd D:\RedKS\apps\customer
+flutter analyze
+flutter test
+flutter build apk --debug
+
+cd D:\RedKS\apps\partner
+flutter analyze
+flutter test
+flutter build apk --debug
+```
