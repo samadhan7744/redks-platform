@@ -66,17 +66,24 @@ npm run lint
 ## Vercel Deployment
 
 1. Import the GitHub repository in Vercel.
-2. Set the root directory to `apps/admin`.
+2. Configure the project settings exactly:
+
+```text
+Root Directory: apps/admin
+Framework Preset: Next.js
+Install Command: npm install
+Build Command: npm run build
+Output Directory: leave empty
+```
+
+Do not set Output Directory to `public`, `.next`, or `out`. Vercel detects the Next.js build output automatically.
+
 3. Add environment variable:
 
 ```text
-NEXT_PUBLIC_API_BASE_URL=https://your-render-backend.onrender.com/api/v1
+NEXT_PUBLIC_API_BASE_URL=https://redks-backend.onrender.com/api/v1
 ```
 
-4. Use the default Vercel Next.js build settings:
+4. Deploy from the selected GitHub branch.
 
-```text
-Install Command: npm install
-Build Command: npm run build
-Output Directory: .next
-```
+The admin root route `/` redirects to `/login`. Protected admin routes then redirect unauthenticated users to `/login`.
