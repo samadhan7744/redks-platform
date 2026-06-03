@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
+import { PaginationControls } from '@/components/pagination-controls';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { ErrorState, LoadingState } from '@/components/state-view';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { api, unwrap } from '@/lib/api';
+import { api, unwrapMeta } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { ItemRequest } from '@/types/api';
 import { useApi } from '@/hooks/use-api';
@@ -16,12 +17,11 @@ import { useApi } from '@/hooks/use-api';
 export default function ItemRequestsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const { data, loading, error } = useApi(async () => unwrap<ItemRequest[]>(await api.get('/item-requests')), []);
-  const filtered = (data ?? []).filter((request) => {
-    const matchesSearch = search ? request.description.toLowerCase().includes(search.toLowerCase()) : true;
-    const matchesStatus = status ? request.status === status : true;
-    return matchesSearch && matchesStatus;
-  });
+  const [page, setPage] = useState(1);
+  const { data, loading, error } = useApi(
+    async () => unwrapMeta<ItemRequest>(await api.get('/admin/item-requests', { params: { search, status: status || undefined, page, limit: 20 } })),
+    [search, status, page],
+  );
 
   return (
     <>
@@ -29,9 +29,9 @@ export default function ItemRequestsPage() {
       <div className="mb-4 grid gap-3 md:grid-cols-[1fr_220px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search request text" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder="Search request text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           <option value="">All statuses</option>
           <option value="OPEN">Open</option>
           <option value="QUOTED">Quoted</option>
@@ -44,7 +44,7 @@ export default function ItemRequestsPage() {
       {error ? <ErrorState message={error} /> : null}
       {data ? (
         <DataTable
-          rows={filtered}
+          rows={data.data}
           columns={[
             { key: 'description', header: 'Request', render: (row) => <div className="max-w-md">{row.description}</div> },
             { key: 'customer', header: 'Customer', render: (row) => row.customer?.phone ?? '-' },
@@ -56,6 +56,7 @@ export default function ItemRequestsPage() {
           ]}
         />
       ) : null}
+      <PaginationControls meta={data?.meta} onPageChange={setPage} />
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { Plus, Save, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
+import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { ErrorState, LoadingState } from '@/components/state-view';
@@ -22,6 +23,10 @@ export default function LocationsPage() {
   const [zoneName, setZoneName] = useState('');
   const [deliveryFee, setDeliveryFee] = useState('30');
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingCity, setEditingCity] = useState<City | null>(null);
+  const [editingZone, setEditingZone] = useState<Zone | null>(null);
+  const [cityEdit, setCityEdit] = useState({ name: '', state: '', isActive: true });
+  const [zoneEdit, setZoneEdit] = useState({ name: '', baseDeliveryFee: '30', isActive: true });
 
   const selectedCity = cities?.find((city) => city.id === selectedCityId) ?? cities?.[0];
   const zones: Zone[] = selectedCity?.zones ?? [];
@@ -58,6 +63,34 @@ export default function LocationsPage() {
 
   async function deactivateZone(id: string) {
     await api.delete(`/zones/${id}`);
+    await reload();
+  }
+
+  function openCity(city: City) {
+    setEditingCity(city);
+    setCityEdit({ name: city.name, state: city.state, isActive: city.isActive });
+  }
+
+  function openZone(zone: Zone) {
+    setEditingZone(zone);
+    setZoneEdit({ name: zone.name, baseDeliveryFee: String(zone.baseDeliveryFee ?? 30), isActive: zone.isActive });
+  }
+
+  async function saveCity() {
+    if (!editingCity) return;
+    await api.patch(`/cities/${editingCity.id}`, cityEdit);
+    setEditingCity(null);
+    await reload();
+  }
+
+  async function saveZone() {
+    if (!editingZone) return;
+    await api.patch(`/zones/${editingZone.id}`, {
+      name: zoneEdit.name,
+      baseDeliveryFee: Number(zoneEdit.baseDeliveryFee),
+      isActive: zoneEdit.isActive,
+    });
+    setEditingZone(null);
     await reload();
   }
 
@@ -98,7 +131,7 @@ export default function LocationsPage() {
             <DataTable
               rows={cities}
               columns={[
-                { key: 'city', header: 'City', render: (row) => <button className="font-medium text-primary" onClick={() => setSelectedCityId(row.id)}>{row.name}</button> },
+                { key: 'city', header: 'City', render: (row) => <button className="font-medium text-primary" onClick={() => { setSelectedCityId(row.id); openCity(row); }}>{row.name}</button> },
                 { key: 'state', header: 'State', render: (row) => row.state },
                 { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.isActive ? 'ACTIVE' : 'INACTIVE'} /> },
                 { key: 'zones', header: 'Zones', render: (row) => row.zones?.length ?? 0 },
@@ -112,7 +145,7 @@ export default function LocationsPage() {
               <DataTable
                 rows={zones}
                 columns={[
-                  { key: 'zone', header: 'Zone', render: (row) => row.name },
+                  { key: 'zone', header: 'Zone', render: (row) => <button className="font-medium text-primary" onClick={() => openZone(row)}>{row.name}</button> },
                   { key: 'fee', header: 'Delivery fee', render: (row) => row.baseDeliveryFee ?? '-' },
                   { key: 'status', header: 'Status', render: (row) => <StatusBadge value={row.isActive ? 'ACTIVE' : 'INACTIVE'} /> },
                   { key: 'actions', header: 'Actions', render: (row) => <Button size="sm" variant="outline" onClick={() => deactivateZone(row.id)}><Trash2 className="h-3 w-3" />Deactivate</Button> },
@@ -122,6 +155,34 @@ export default function LocationsPage() {
           </Card>
         </div>
       </div>
+      <Modal title="Edit city" open={!!editingCity} onClose={() => setEditingCity(null)}>
+        <div className="space-y-3">
+          <Input value={cityEdit.name} onChange={(e) => setCityEdit({ ...cityEdit, name: e.target.value })} />
+          <Input value={cityEdit.state} onChange={(e) => setCityEdit({ ...cityEdit, state: e.target.value })} />
+          <Select value={cityEdit.isActive ? 'true' : 'false'} onChange={(e) => setCityEdit({ ...cityEdit, isActive: e.target.value === 'true' })}>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </Select>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingCity(null)}>Cancel</Button>
+            <Button onClick={saveCity}>Save city</Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal title="Edit zone" open={!!editingZone} onClose={() => setEditingZone(null)}>
+        <div className="space-y-3">
+          <Input value={zoneEdit.name} onChange={(e) => setZoneEdit({ ...zoneEdit, name: e.target.value })} />
+          <Input type="number" value={zoneEdit.baseDeliveryFee} onChange={(e) => setZoneEdit({ ...zoneEdit, baseDeliveryFee: e.target.value })} />
+          <Select value={zoneEdit.isActive ? 'true' : 'false'} onChange={(e) => setZoneEdit({ ...zoneEdit, isActive: e.target.value === 'true' })}>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </Select>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingZone(null)}>Cancel</Button>
+            <Button onClick={saveZone}>Save zone</Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

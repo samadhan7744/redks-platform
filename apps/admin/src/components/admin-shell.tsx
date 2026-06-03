@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Bike,
   Boxes,
   Building2,
   ClipboardList,
@@ -16,6 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
@@ -25,6 +27,7 @@ const navItems = [
   { href: '/shops', label: 'Shops', icon: Building2 },
   { href: '/orders', label: 'Orders', icon: ClipboardList },
   { href: '/users', label: 'Users', icon: Users },
+  { href: '/riders', label: 'Riders', icon: Bike },
   { href: '/categories', label: 'Categories', icon: ListTree },
   { href: '/locations', label: 'Cities & Zones', icon: Map },
   { href: '/products', label: 'Products', icon: Boxes },
@@ -36,6 +39,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { accessToken, user, logout } = useAuthStore();
   const [open, setOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   useEffect(() => {
     if (!accessToken) router.replace('/login');
@@ -103,10 +107,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                logout();
-                router.replace('/login');
-              }}
+              onClick={() => setConfirmLogout(true)}
             >
               <LogOut className="h-4 w-4" />
               Sign out
@@ -115,6 +116,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="p-4 lg:p-6">{children}</main>
       </div>
+      <ConfirmDialog
+        open={confirmLogout}
+        title="Sign out"
+        description="You will need to verify OTP again to access the admin panel."
+        confirmLabel="Sign out"
+        onClose={() => setConfirmLogout(false)}
+        onConfirm={() => {
+          logout();
+          router.replace('/login');
+        }}
+      />
     </div>
   );
 }

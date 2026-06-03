@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { ShoppingBag } from 'lucide-react';
 import { api, getErrorMessage, unwrap } from '@/lib/api';
 import { useAuthStore } from '@/store/auth-store';
@@ -29,8 +29,15 @@ export default function LoginPage() {
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [resendIn, setResendIn] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!resendIn) return;
+    const timer = window.setInterval(() => setResendIn((value) => Math.max(value - 1, 0)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendIn]);
 
   async function requestOtp(event: FormEvent) {
     event.preventDefault();
@@ -39,6 +46,7 @@ export default function LoginPage() {
     try {
       const response = await api.post('/auth/request-otp', { phone });
       setDevOtp(response.data.devOtp ?? null);
+      setResendIn(30);
       setStep('otp');
     } catch (err) {
       setError(getErrorMessage(err));
@@ -55,7 +63,7 @@ export default function LoginPage() {
       const session = unwrap<VerifyResponse>(await api.post('/auth/verify-otp', { phone, otp }));
       const allowed = session.user.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role));
       if (!allowed) {
-        setError('Admin or Super Admin role is required.');
+        setError('This phone number is not assigned an Admin or Super Admin role.');
         return;
       }
       setSession(session);
@@ -114,6 +122,17 @@ export default function LoginPage() {
                 {step === 'otp' ? (
                   <Button type="button" variant="ghost" className="w-full" onClick={() => setStep('phone')}>
                     Change phone number
+                  </Button>
+                ) : null}
+                {step === 'otp' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={loading || resendIn > 0}
+                    onClick={(event) => requestOtp(event)}
+                  >
+                    {resendIn > 0 ? `Resend OTP in ${resendIn}s` : 'Resend OTP'}
                   </Button>
                 ) : null}
               </form>

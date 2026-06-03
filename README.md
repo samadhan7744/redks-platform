@@ -149,6 +149,9 @@ The seed script creates:
 - `PATCH /api/v1/admin/shops/:id/approve`
 - `PATCH /api/v1/admin/shops/:id/reject`
 - `PATCH /api/v1/admin/shops/:id/suspend`
+- `GET /api/v1/admin/riders`
+- `GET /api/v1/admin/products`
+- `GET /api/v1/admin/item-requests`
 - `GET /api/v1/admin/dashboard/summary`
 - `PATCH /api/v1/delivery/rider/availability`
 - `GET /health`

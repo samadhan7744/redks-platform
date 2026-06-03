@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { ItemRequestStatus, RiderAvailabilityStatus, RiderStatus, ShopStatus } from '@prisma/client';
+import { ItemRequestStatus, ProductStatus, RiderAvailabilityStatus, RiderStatus, ShopStatus } from '@prisma/client';
 import { ok, paginated, paginationParams } from '../../common/utils/api-response.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AdminItemRequestQueryDto } from './dto/admin-item-request-query.dto';
+import { AdminProductQueryDto } from './dto/admin-product-query.dto';
+import { AdminRiderQueryDto } from './dto/admin-rider-query.dto';
 import { AdminShopQueryDto } from './dto/admin-shop-query.dto';
 import { UpdateRiderStatusDto } from './dto/update-rider-status.dto';
 
@@ -70,6 +73,38 @@ export class AdminService {
     }));
   }
 
+  async findRiders(query: AdminRiderQueryDto) {
+    const { page, limit, skip, take } = paginationParams(query.page, query.limit);
+    const where = {
+      status: query.status,
+      availabilityStatus: query.availabilityStatus,
+      cityId: query.cityId,
+      zoneId: query.zoneId,
+      user: query.search
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: 'insensitive' as const } },
+              { phone: { contains: query.search } },
+              { email: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : undefined,
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.riderProfile.findMany({
+        where,
+        skip,
+        take,
+        include: { user: true, city: true, zone: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.riderProfile.count({ where }),
+    ]);
+
+    return paginated(data, total, page, limit);
+  }
+
   async updateRiderStatus(adminId: string, riderId: string, dto: UpdateRiderStatusDto) {
     if (dto.status === RiderStatus.REJECTED && !dto.rejectionReason) {
       throw new BadRequestException('Rejection reason is required');
@@ -120,5 +155,58 @@ export class AdminService {
       ridersOnline,
       pendingItemRequests,
     });
+  }
+
+  async findItemRequests(query: AdminItemRequestQueryDto) {
+    const { page, limit, skip, take } = paginationParams(query.page, query.limit);
+    const where = {
+      status: query.status,
+      cityId: query.cityId,
+      zoneId: query.zoneId,
+      OR: query.search
+        ? [{ description: { contains: query.search, mode: 'insensitive' as const } }]
+        : undefined,
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.itemRequest.findMany({
+        where,
+        skip,
+        take,
+        include: { customer: true, city: true, zone: true, shop: true, quotes: { include: { shop: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.itemRequest.count({ where }),
+    ]);
+
+    return paginated(data, total, page, limit);
+  }
+
+  async findProducts(query: AdminProductQueryDto) {
+    const { page, limit, skip, take } = paginationParams(query.page, query.limit);
+    const where = {
+      shopId: query.shopId,
+      categoryId: query.categoryId,
+      status: query.status,
+      OR: query.search
+        ? [
+            { name: { contains: query.search, mode: 'insensitive' as const } },
+            { description: { contains: query.search, mode: 'insensitive' as const } },
+          ]
+        : undefined,
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        skip,
+        take,
+        include: { shop: true, category: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return paginated(data, total, page, limit);
   }
 }

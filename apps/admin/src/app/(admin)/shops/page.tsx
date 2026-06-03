@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, Search, ShieldOff, X } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
+import { PaginationControls } from '@/components/pagination-controls';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
 import { ErrorState, LoadingState } from '@/components/state-view';
@@ -17,9 +18,10 @@ import { useApi } from '@/hooks/use-api';
 export default function ShopsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
   const { data, loading, error, reload } = useApi(
-    async () => unwrapMeta<Shop>(await api.get('/admin/shops', { params: { search, status: status || undefined, limit: 50 } })),
-    [search, status],
+    async () => unwrapMeta<Shop>(await api.get('/admin/shops', { params: { search, status: status || undefined, page, limit: 20 } })),
+    [search, status, page],
   );
 
   async function action(id: string, type: 'approve' | 'reject' | 'suspend') {
@@ -34,9 +36,9 @@ export default function ShopsPage() {
       <div className="mb-4 grid gap-3 md:grid-cols-[1fr_220px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search shops or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder="Search shops or phone" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           <option value="">All statuses</option>
           <option value="PENDING_APPROVAL">Pending approval</option>
           <option value="APPROVED">Approved</option>
@@ -69,6 +71,7 @@ export default function ShopsPage() {
           ]}
         />
       ) : null}
+      <PaginationControls meta={data?.meta} onPageChange={setPage} />
     </>
   );
 }

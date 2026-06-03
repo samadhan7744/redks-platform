@@ -8,6 +8,18 @@ export type User = {
   createdAt?: string;
 };
 
+export type Rider = {
+  id: string;
+  status: string;
+  availabilityStatus: string;
+  vehicleType?: string | null;
+  vehicleNumber?: string | null;
+  user?: User;
+  city?: City;
+  zone?: Zone | null;
+  createdAt?: string;
+};
+
 export type City = {
   id: string;
   name: string;

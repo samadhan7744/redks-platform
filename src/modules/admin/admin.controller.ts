@@ -6,6 +6,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthUser } from '../../common/types/auth-user.type';
+import { AdminItemRequestQueryDto } from './dto/admin-item-request-query.dto';
+import { AdminProductQueryDto } from './dto/admin-product-query.dto';
+import { AdminRiderQueryDto } from './dto/admin-rider-query.dto';
 import { AdminShopQueryDto } from './dto/admin-shop-query.dto';
 import { RejectShopDto } from './dto/reject-shop.dto';
 import { AdminService } from './admin.service';
@@ -49,6 +52,11 @@ export class AdminController {
     return this.adminService.pendingRiders();
   }
 
+  @Get('riders')
+  riders(@Query() query: AdminRiderQueryDto) {
+    return this.adminService.findRiders(query);
+  }
+
   @Patch('riders/:id/status')
   updateRiderStatus(
     @CurrentUser() user: AuthUser,
@@ -61,5 +69,15 @@ export class AdminController {
   @Get('dashboard/summary')
   dashboardSummary() {
     return this.adminService.dashboardSummary();
+  }
+
+  @Get('item-requests')
+  itemRequests(@Query() query: AdminItemRequestQueryDto) {
+    return this.adminService.findItemRequests(query);
+  }
+
+  @Get('products')
+  products(@Query() query: AdminProductQueryDto) {
+    return this.adminService.findProducts(query);
   }
 }

@@ -40,6 +40,7 @@ npm run start
 - `/shops`
 - `/orders`
 - `/users`
+- `/riders`
 - `/categories`
 - `/locations`
 - `/products`
@@ -51,3 +52,13 @@ npm run start
 - The Axios client injects the JWT access token from the persisted auth store.
 - Protected routes redirect to `/login` when no token is available.
 - The backend must be running at `http://localhost:3000/api/v1`.
+- `NEXT_PUBLIC_API_BASE_URL` is validated at startup; builds fail if it is missing.
+- List pages use backend pagination metadata where supported.
+- Admin lint is isolated with `eslint.config.mjs` so it does not inherit the backend ESLint project config.
+
+## Validation
+
+```powershell
+npm run build
+npm run lint
+```
