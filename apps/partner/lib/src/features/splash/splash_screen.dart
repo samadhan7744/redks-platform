@@ -5,23 +5,33 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
+      backgroundColor: const Color(0xFF111827),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'RedKS',
+            Image.asset(
+              'assets/images/redks_logo.png',
+              width: 180,
+              semanticLabel: 'RedKS logo',
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'RedKS Partner',
               style: TextStyle(
-                fontSize: 38,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFFB91C1C),
+                color: Colors.white,
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
               ),
             ),
-            SizedBox(height: 8),
-            Text('Har Dukaan, Ghar Tak.'),
-            SizedBox(height: 24),
-            CircularProgressIndicator(),
+            const SizedBox(height: 8),
+            const Text(
+              'Shop & Delivery Network',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(color: Color(0xFFDC2626)),
           ],
         ),
       ),

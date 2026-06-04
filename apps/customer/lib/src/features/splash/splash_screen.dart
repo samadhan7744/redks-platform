@@ -7,15 +7,19 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.dark,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.shopping_bag, color: AppTheme.red, size: 64),
-            SizedBox(height: 16),
-            Text(
+            Image.asset(
+              'assets/images/redks_logo.png',
+              width: 180,
+              semanticLabel: 'RedKS logo',
+            ),
+            const SizedBox(height: 20),
+            const Text(
               'RedKS',
               style: TextStyle(
                 color: Colors.white,
@@ -23,8 +27,8 @@ class SplashScreen extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            SizedBox(height: 6),
-            Text(
+            const SizedBox(height: 6),
+            const Text(
               'Har Dukaan, Ghar Tak.',
               style: TextStyle(color: Colors.white70),
             ),
