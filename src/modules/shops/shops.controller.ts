@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,6 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { CreateShopDto } from './dto/create-shop.dto';
+import { CreateShopDocumentDto } from './dto/create-shop-document.dto';
 import { ShopQueryDto } from './dto/shop-query.dto';
 import { UpdateMyShopStatusDto } from './dto/update-my-shop-status.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
@@ -26,7 +36,12 @@ export class ShopsController {
   @Post('register')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.SHOP_OWNER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateShopDto) {
     return this.shopsService.create(user.sub, dto);
   }
@@ -47,11 +62,33 @@ export class ShopsController {
     return this.shopsService.updateMyShop(user.sub, dto);
   }
 
+  @Post('my-shop/documents')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  createMyShopDocument(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateShopDocumentDto,
+  ) {
+    return this.shopsService.createMyShopDocument(user.sub, dto);
+  }
+
+  @Get('my-shop/documents')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  myShopDocuments(@CurrentUser() user: AuthUser) {
+    return this.shopsService.findMyShopDocuments(user.sub);
+  }
+
   @Patch('my-shop/status')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  updateMyStatus(@CurrentUser() user: AuthUser, @Body() dto: UpdateMyShopStatusDto) {
+  updateMyStatus(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateMyShopStatusDto,
+  ) {
     return this.shopsService.updateMyStatus(user.sub, dto);
   }
 
@@ -64,7 +101,11 @@ export class ShopsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  updateStatus(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateShopStatusDto) {
+  updateStatus(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateShopStatusDto,
+  ) {
     return this.shopsService.updateStatus(user.sub, id, dto);
   }
 }

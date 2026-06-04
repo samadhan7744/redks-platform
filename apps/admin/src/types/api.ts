@@ -52,12 +52,44 @@ export type Category = {
 export type Shop = {
   id: string;
   name: string;
+  shopName?: string | null;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
   phone: string;
   status: string;
+  verificationStatus?: string;
   deliveryMode: string;
+  addressLine1?: string;
+  addressLine2?: string | null;
+  pincode?: string;
+  upiId?: string | null;
+  gstNumber?: string | null;
+  fssaiNumber?: string | null;
+  panNumber?: string | null;
+  shopPhotoUrl?: string | null;
+  deliveryRadiusKm?: string | number | null;
+  minOrderValue?: string | number;
+  openingTime?: string | null;
+  closingTime?: string | null;
+  weeklyOffDay?: string | null;
+  commissionPercent?: string | number;
+  rejectionReason?: string | null;
   city?: City;
   zone?: Zone;
+  category?: Category | null;
+  categories?: Array<{ category?: Category }>;
+  documents?: ShopDocument[];
   owner?: User;
+  createdAt?: string;
+};
+
+export type ShopDocument = {
+  id: string;
+  shopId: string;
+  type: string;
+  fileUrl: string;
+  status: string;
+  rejectionReason?: string | null;
   createdAt?: string;
 };
 
@@ -86,7 +118,13 @@ export type Order = {
   customer?: User;
   shop?: Shop;
   rider?: { user?: User } | null;
-  items?: Array<{ id: string; name: string; quantity: number; unitPrice: string | number; lineTotal: string | number }>;
+  items?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    unitPrice: string | number;
+    lineTotal: string | number;
+  }>;
 };
 
 export type ItemRequest = {
@@ -98,6 +136,11 @@ export type ItemRequest = {
   city?: City;
   zone?: Zone | null;
   shop?: Shop | null;
-  quotes?: Array<{ id: string; amount: string | number; status: string; shop?: Shop | null }>;
+  quotes?: Array<{
+    id: string;
+    amount: string | number;
+    status: string;
+    shop?: Shop | null;
+  }>;
   createdAt: string;
 };

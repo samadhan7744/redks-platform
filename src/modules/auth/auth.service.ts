@@ -1,4 +1,10 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { UserRole } from '@prisma/client';
@@ -20,38 +26,67 @@ export class AuthService {
   ) {}
 
   async requestOtp(dto: RequestOtpDto) {
+    const totalStart = performance.now();
     const otp =
       this.configService.get('NODE_ENV') === 'production'
         ? randomInt(100000, 999999).toString()
         : this.configService.get<string>('OTP_DEV_CODE', '123456');
     const ttlSeconds = this.configService.get<number>('OTP_TTL_SECONDS', 300);
 
-    await this.redis.setOtp(dto.phone, this.hashOtp(dto.phone, otp), ttlSeconds);
+    const redisStart = performance.now();
+    await this.redis.setOtp(
+      dto.phone,
+      this.hashOtp(dto.phone, otp),
+      ttlSeconds,
+    );
     await this.redis.resetOtpAttempts(dto.phone, ttlSeconds);
+    const redisMs = performance.now() - redisStart;
+    this.logTiming('auth/request-otp', {
+      totalMs: performance.now() - totalStart,
+      redisSetMs: redisMs,
+    });
 
     return {
       success: true,
-      message: 'OTP generated. SMS provider integration will be added in a later phase.',
+      message:
+        'OTP generated. SMS provider integration will be added in a later phase.',
       expiresInSeconds: ttlSeconds,
-      devOtp: this.configService.get('NODE_ENV') === 'production' ? undefined : otp,
+      devOtp:
+        this.configService.get('NODE_ENV') === 'production' ? undefined : otp,
     };
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
+    const totalStart = performance.now();
     const ttlSeconds = this.configService.get<number>('OTP_TTL_SECONDS', 300);
     const maxAttempts = this.configService.get<number>('OTP_MAX_ATTEMPTS', 5);
-    const attempts = await this.redis.incrementOtpAttempts(dto.phone, ttlSeconds);
+    const redisStart = performance.now();
+    const attempts = await this.redis.incrementOtpAttempts(
+      dto.phone,
+      ttlSeconds,
+    );
 
     if (attempts > maxAttempts) {
-      throw new HttpException('Too many OTP verification attempts', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Too many OTP verification attempts',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     const expectedOtp = await this.redis.getOtp(dto.phone);
+    const redisMs = performance.now() - redisStart;
 
     if (!expectedOtp || expectedOtp !== this.hashOtp(dto.phone, dto.otp)) {
+      this.logTiming('auth/verify-otp', {
+        totalMs: performance.now() - totalStart,
+        redisGetMs: redisMs,
+        prismaUpsertMs: 0,
+        jwtGenerationMs: 0,
+      });
       throw new BadRequestException('Invalid or expired OTP');
     }
 
+    const prismaStart = performance.now();
     const user = await this.prisma.user.upsert({
       where: { phone: dto.phone },
       update: { lastLoginAt: new Date(), status: 'ACTIVE' },
@@ -62,6 +97,7 @@ export class AuthService {
         lastLoginAt: new Date(),
       },
     });
+    const prismaMs = performance.now() - prismaStart;
 
     await this.redis.deleteOtp(dto.phone);
 
@@ -71,34 +107,57 @@ export class AuthService {
       roles: user.roles,
     };
 
+    const jwtStart = performance.now();
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshToken = await this.jwtService.signAsync(
       { ...payload, tokenType: 'refresh' },
       {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d') as JwtSignOptions['expiresIn'],
+        secret: this.configService.get<string>(
+          'JWT_REFRESH_SECRET',
+          'dev-refresh-secret',
+        ),
+        expiresIn: this.configService.get<string>(
+          'JWT_REFRESH_EXPIRES_IN',
+          '30d',
+        ) as JwtSignOptions['expiresIn'],
       },
     );
+    const jwtMs = performance.now() - jwtStart;
+    this.logTiming('auth/verify-otp', {
+      totalMs: performance.now() - totalStart,
+      redisGetMs: redisMs,
+      prismaUpsertMs: prismaMs,
+      jwtGenerationMs: jwtMs,
+    });
 
-    return ok({
-      accessToken,
-      refreshToken,
-      refreshTokenPlaceholder: 'Persist hashed refresh tokens and rotation metadata in a later auth phase.',
-      user,
-    }, 'OTP verified');
+    return ok(
+      {
+        accessToken,
+        refreshToken,
+        refreshTokenPlaceholder:
+          'Persist hashed refresh tokens and rotation metadata in a later auth phase.',
+        user,
+      },
+      'OTP verified',
+    );
   }
 
   async refreshToken(dto: RefreshTokenDto) {
     try {
       const payload = await this.jwtService.verifyAsync(dto.refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
+        secret: this.configService.get<string>(
+          'JWT_REFRESH_SECRET',
+          'dev-refresh-secret',
+        ),
       });
 
       if (payload.tokenType !== 'refresh') {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      const user = await this.prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
+      const user = await this.prisma.user.findUniqueOrThrow({
+        where: { id: payload.sub },
+      });
       const accessToken = await this.jwtService.signAsync({
         sub: user.id,
         phone: user.phone,
@@ -126,6 +185,15 @@ export class AuthService {
 
   private hashOtp(phone: string, otp: string) {
     const secret = this.configService.get<string>('JWT_SECRET', 'dev-secret');
-    return createHash('sha256').update(`${phone}:${otp}:${secret}`).digest('hex');
+    return createHash('sha256')
+      .update(`${phone}:${otp}:${secret}`)
+      .digest('hex');
+  }
+
+  private logTiming(operation: string, timings: Record<string, number>) {
+    const formatted = Object.entries(timings)
+      .map(([key, value]) => `${key}=${value.toFixed(2)}ms`)
+      .join(' ');
+    console.log(`[perf] ${operation} ${formatted}`);
   }
 }

@@ -200,34 +200,70 @@ class ShopFormScreen extends ConsumerStatefulWidget {
 
 class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _phone = TextEditingController();
-  final _address = TextEditingController();
+  final _ownerName = TextEditingController();
+  final _ownerPhone = TextEditingController();
+  final _shopName = TextEditingController();
+  final _address1 = TextEditingController();
+  final _address2 = TextEditingController();
   final _pincode = TextEditingController();
+  final _upiId = TextEditingController();
+  final _gst = TextEditingController();
+  final _fssai = TextEditingController();
+  final _pan = TextEditingController();
+  final _photoUrl = TextEditingController();
+  final _radius = TextEditingController(text: '5');
+  final _minOrder = TextEditingController(text: '0');
+  final _opening = TextEditingController(text: '09:00');
+  final _closing = TextEditingController(text: '21:00');
+  final _gstUrl = TextEditingController();
+  final _fssaiUrl = TextEditingController();
+  final _panUrl = TextEditingController();
+  int _step = 0;
   bool _loading = false;
   String? _error;
   String? _cityId;
   String? _zoneId;
+  String? _categoryId;
+  String _deliveryMode = 'REDKS';
+  String _weeklyOff = 'Sunday';
   List<CityModel> _cities = [];
   List<ZoneModel> _zones = [];
+  List<CategoryModel> _categories = [];
 
   @override
   void initState() {
     super.initState();
-    _name.text = widget.existing?.name ?? '';
-    _phone.text = widget.existing?.phone ?? '';
+    _ownerName.text = widget.existing?.ownerName ?? '';
+    _ownerPhone.text =
+        widget.existing?.ownerPhone ?? widget.existing?.phone ?? '';
+    _shopName.text = widget.existing?.name ?? '';
     _pincode.text = '560001';
     _cityId = widget.existing?.city?.id;
     _zoneId = widget.existing?.zone?.id;
+    _categoryId = widget.existing?.category?.id;
     _loadMeta();
   }
 
   @override
   void dispose() {
-    _name.dispose();
-    _phone.dispose();
-    _address.dispose();
+    _ownerName.dispose();
+    _ownerPhone.dispose();
+    _shopName.dispose();
+    _address1.dispose();
+    _address2.dispose();
     _pincode.dispose();
+    _upiId.dispose();
+    _gst.dispose();
+    _fssai.dispose();
+    _pan.dispose();
+    _photoUrl.dispose();
+    _radius.dispose();
+    _minOrder.dispose();
+    _opening.dispose();
+    _closing.dispose();
+    _gstUrl.dispose();
+    _fssaiUrl.dispose();
+    _panUrl.dispose();
     super.dispose();
   }
 
@@ -235,12 +271,14 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     final repo = ref.read(partnerRepositoryProvider);
     try {
       final cities = await repo.cities();
+      final categories = await repo.categories();
       final zones = _cityId == null
           ? <ZoneModel>[]
           : await repo.zones(_cityId!);
       if (mounted) {
         setState(() {
           _cities = cities;
+          _categories = categories;
           _zones = zones;
         });
       }
@@ -265,15 +303,29 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       _error = null;
     });
     final data = {
-      'name': _name.text.trim(),
-      'phone': _phone.text.trim(),
-      'addressLine1': _address.text.trim().isEmpty
-          ? 'Address pending'
-          : _address.text.trim(),
+      'ownerName': _ownerName.text.trim(),
+      'ownerPhone': _ownerPhone.text.trim(),
+      'shopName': _shopName.text.trim(),
+      'name': _shopName.text.trim(),
+      'phone': _ownerPhone.text.trim(),
+      'addressLine1': _address1.text.trim(),
+      'addressLine2': _address2.text.trim(),
       'pincode': _pincode.text.trim(),
+      'upiId': _upiId.text.trim(),
+      'gstNumber': _blankToNull(_gst.text),
+      'fssaiNumber': _blankToNull(_fssai.text),
+      'panNumber': _blankToNull(_pan.text),
+      'shopPhotoUrl': _blankToNull(_photoUrl.text),
+      'deliveryMode': _deliveryMode,
+      'deliveryRadiusKm': double.tryParse(_radius.text.trim()) ?? 0,
+      'minOrderValue': double.tryParse(_minOrder.text.trim()) ?? 0,
+      'openingTime': _opening.text.trim(),
+      'closingTime': _closing.text.trim(),
+      'weeklyOffDay': _weeklyOff,
+      if (_categoryId != null) 'categoryId': _categoryId,
       if (_cityId != null) 'cityId': _cityId,
       if (_zoneId != null) 'zoneId': _zoneId,
-    };
+    }..removeWhere((key, value) => value == null || value == '');
     try {
       final repo = ref.read(partnerRepositoryProvider);
       if (widget.existing == null) {
@@ -281,6 +333,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       } else {
         await repo.updateMyShop(data);
       }
+      await _uploadDocumentPlaceholders(repo);
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
       setState(() {
@@ -292,6 +345,14 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final titles = [
+      'Basic',
+      'Address',
+      'Business',
+      'Delivery',
+      'Documents',
+      'Review',
+    ];
     return Scaffold(
       appBar: RedKsAppBar(
         title: widget.existing == null
@@ -303,89 +364,318 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            TextFormField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'Shop name'),
-              validator: _required,
+            Text(
+              'Step ${_step + 1} of 6: ${titles[_step]}',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _phone,
-              decoration: const InputDecoration(labelText: 'Shop phone'),
-              keyboardType: TextInputType.phone,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(10),
-              ],
-              validator: _required,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _address,
-              decoration: const InputDecoration(labelText: 'Address'),
-              minLines: 2,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _pincode,
-              decoration: const InputDecoration(labelText: 'Pincode'),
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6),
-              ],
-              validator: (value) => (value ?? '').trim().length == 6
-                  ? null
-                  : 'Enter a 6 digit pincode.',
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _cityId,
-              decoration: const InputDecoration(labelText: 'City'),
-              items: _cities
-                  .map(
-                    (city) => DropdownMenuItem(
-                      value: city.id,
-                      child: Text(city.name),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) _loadZones(value);
-              },
-              validator: (value) => value == null ? 'Select city.' : null,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _zoneId,
-              decoration: const InputDecoration(labelText: 'Zone'),
-              items: _zones
-                  .map(
-                    (zone) => DropdownMenuItem(
-                      value: zone.id,
-                      child: Text(zone.name),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _zoneId = value),
-              validator: (value) => value == null ? 'Select zone.' : null,
-            ),
+            LinearProgressIndicator(value: (_step + 1) / 6),
+            const SizedBox(height: 16),
+            if (_step == 0) _basicStep(),
+            if (_step == 1) _addressStep(),
+            if (_step == 2) _businessStep(),
+            if (_step == 3) _deliveryStep(),
+            if (_step == 4) _documentsStep(),
+            if (_step == 5) _reviewStep(),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Text(_error!, style: const TextStyle(color: Colors.red)),
               ),
             const SizedBox(height: 20),
-            PrimaryButton(
-              label: 'Save shop',
-              loading: _loading,
-              onPressed: _save,
+            Row(
+              children: [
+                if (_step > 0)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _loading
+                          ? null
+                          : () => setState(() => _step--),
+                      child: const Text('Back'),
+                    ),
+                  ),
+                if (_step > 0) const SizedBox(width: 12),
+                Expanded(
+                  child: PrimaryButton(
+                    label: _step == 5 ? 'Submit for approval' : 'Next',
+                    loading: _loading,
+                    onPressed: _step == 5
+                        ? _save
+                        : () {
+                            if (_formKey.currentState!.validate()) {
+                              setState(() => _step++);
+                            }
+                          },
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _basicStep() => Column(
+    children: [
+      TextFormField(
+        controller: _shopName,
+        decoration: const InputDecoration(labelText: 'Shop name'),
+        validator: _required,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _ownerName,
+        decoration: const InputDecoration(labelText: 'Owner name'),
+        validator: _required,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _ownerPhone,
+        decoration: const InputDecoration(labelText: 'Owner phone'),
+        keyboardType: TextInputType.phone,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(10),
+        ],
+        validator: _phoneValidator,
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        initialValue: _categoryId,
+        decoration: const InputDecoration(labelText: 'Primary category'),
+        items: _categories
+            .map(
+              (category) => DropdownMenuItem(
+                value: category.id,
+                child: Text(category.name),
+              ),
+            )
+            .toList(),
+        onChanged: (value) => setState(() => _categoryId = value),
+        validator: (value) => value == null ? 'Select category.' : null,
+      ),
+    ],
+  );
+
+  Widget _addressStep() => Column(
+    children: [
+      TextFormField(
+        controller: _address1,
+        decoration: const InputDecoration(labelText: 'Address line 1'),
+        validator: _required,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _address2,
+        decoration: const InputDecoration(labelText: 'Address line 2'),
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        initialValue: _cityId,
+        decoration: const InputDecoration(labelText: 'City'),
+        items: _cities
+            .map(
+              (city) =>
+                  DropdownMenuItem(value: city.id, child: Text(city.name)),
+            )
+            .toList(),
+        onChanged: (value) {
+          if (value != null) _loadZones(value);
+        },
+        validator: (value) => value == null ? 'Select city.' : null,
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        initialValue: _zoneId,
+        decoration: const InputDecoration(labelText: 'Zone'),
+        items: _zones
+            .map(
+              (zone) =>
+                  DropdownMenuItem(value: zone.id, child: Text(zone.name)),
+            )
+            .toList(),
+        onChanged: (value) => setState(() => _zoneId = value),
+        validator: (value) => value == null ? 'Select zone.' : null,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _pincode,
+        decoration: const InputDecoration(labelText: 'Pincode'),
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(6),
+        ],
+        validator: _pincodeValidator,
+      ),
+    ],
+  );
+
+  Widget _businessStep() => Column(
+    children: [
+      TextFormField(
+        controller: _upiId,
+        decoration: const InputDecoration(labelText: 'UPI ID'),
+        validator: _upiValidator,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _gst,
+        decoration: const InputDecoration(labelText: 'GST number optional'),
+        textCapitalization: TextCapitalization.characters,
+        validator: _optionalGstValidator,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _fssai,
+        decoration: const InputDecoration(labelText: 'FSSAI number optional'),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _pan,
+        decoration: const InputDecoration(labelText: 'PAN number optional'),
+        textCapitalization: TextCapitalization.characters,
+        validator: _optionalPanValidator,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _photoUrl,
+        decoration: const InputDecoration(
+          labelText: 'Shop photo URL placeholder',
+        ),
+      ),
+    ],
+  );
+
+  Widget _deliveryStep() => Column(
+    children: [
+      DropdownButtonFormField<String>(
+        initialValue: _deliveryMode,
+        decoration: const InputDecoration(labelText: 'Delivery mode'),
+        items: const [
+          DropdownMenuItem(value: 'REDKS', child: Text('RedKS delivery')),
+          DropdownMenuItem(value: 'SELF', child: Text('Self delivery')),
+          DropdownMenuItem(value: 'HYBRID', child: Text('Hybrid')),
+        ],
+        onChanged: (value) => setState(() => _deliveryMode = value ?? 'REDKS'),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _radius,
+        decoration: const InputDecoration(labelText: 'Delivery radius km'),
+        keyboardType: TextInputType.number,
+        validator: _number,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _minOrder,
+        decoration: const InputDecoration(labelText: 'Minimum order value'),
+        keyboardType: TextInputType.number,
+        validator: _number,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _opening,
+        decoration: const InputDecoration(
+          labelText: 'Opening time, e.g. 09:00',
+        ),
+        validator: _required,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _closing,
+        decoration: const InputDecoration(
+          labelText: 'Closing time, e.g. 21:00',
+        ),
+        validator: _required,
+      ),
+      const SizedBox(height: 12),
+      DropdownButtonFormField<String>(
+        initialValue: _weeklyOff,
+        decoration: const InputDecoration(labelText: 'Weekly off day'),
+        items: const [
+          'None',
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Sunday',
+        ].map((day) => DropdownMenuItem(value: day, child: Text(day))).toList(),
+        onChanged: (value) => setState(() => _weeklyOff = value ?? 'Sunday'),
+      ),
+    ],
+  );
+
+  Widget _documentsStep() => Column(
+    children: [
+      TextFormField(
+        controller: _gstUrl,
+        decoration: const InputDecoration(
+          labelText: 'GST document URL placeholder',
+        ),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _fssaiUrl,
+        decoration: const InputDecoration(
+          labelText: 'FSSAI document URL placeholder',
+        ),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _panUrl,
+        decoration: const InputDecoration(
+          labelText: 'PAN document URL placeholder',
+        ),
+      ),
+      const SizedBox(height: 8),
+      const Text(
+        'File upload will use Cloudflare R2/S3 in a later phase. Paste temporary document URLs for now.',
+      ),
+    ],
+  );
+
+  Widget _reviewStep() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _shopName.text,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          Text('Owner: ${_ownerName.text} / ${_ownerPhone.text}'),
+          Text('Address: ${_address1.text}, ${_pincode.text}'),
+          Text('UPI: ${_upiId.text}'),
+          Text('Delivery: $_deliveryMode, ${_radius.text} km'),
+          Text(
+            'Timings: ${_opening.text} - ${_closing.text}, off: $_weeklyOff',
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> _uploadDocumentPlaceholders(PartnerRepository repo) async {
+    final docs = {
+      'GST': _gstUrl.text.trim(),
+      'FSSAI': _fssaiUrl.text.trim(),
+      'PAN': _panUrl.text.trim(),
+      'SHOP_PHOTO': _photoUrl.text.trim(),
+    };
+    for (final entry in docs.entries) {
+      if (entry.value.isNotEmpty) {
+        await repo.createShopDocument({
+          'type': entry.key,
+          'fileUrl': entry.value,
+        });
+      }
+    }
   }
 }
 
@@ -944,6 +1234,38 @@ class _ShopHeader extends StatelessWidget {
           Text(
             [shop.city?.name, shop.zone?.name].whereType<String>().join(' / '),
           ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              StatusBadge(shop.verificationStatus ?? shop.status),
+              if (shop.category != null) StatusBadge(shop.category!.name),
+            ],
+          ),
+          if (shop.status == 'PENDING_APPROVAL')
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Pending approval. RedKS admin will review your shop profile and documents.',
+              ),
+            ),
+          if (shop.status == 'REJECTED')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Rejected: ${shop.rejectionReason ?? 'Please update details and resubmit.'}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          if (shop.status == 'SUSPENDED')
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Suspended. Contact RedKS support before accepting new orders.',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: onEdit,
@@ -1143,3 +1465,44 @@ String? _number(String? value) =>
     double.tryParse((value ?? '').trim()) == null ? 'Enter a number.' : null;
 String? _integer(String? value) =>
     int.tryParse((value ?? '').trim()) == null ? 'Enter a whole number.' : null;
+String? _phoneValidator(String? value) {
+  final text = (value ?? '').trim();
+  return RegExp(r'^[6-9]\d{9}$').hasMatch(text)
+      ? null
+      : 'Enter a valid Indian mobile number.';
+}
+
+String? _pincodeValidator(String? value) {
+  final text = (value ?? '').trim();
+  return RegExp(r'^\d{6}$').hasMatch(text) ? null : 'Enter a 6 digit pincode.';
+}
+
+String? _upiValidator(String? value) {
+  final text = (value ?? '').trim();
+  return RegExp(r'^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$').hasMatch(text)
+      ? null
+      : 'Enter a valid UPI ID.';
+}
+
+String? _optionalGstValidator(String? value) {
+  final text = (value ?? '').trim().toUpperCase();
+  if (text.isEmpty) return null;
+  return RegExp(
+        r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$',
+      ).hasMatch(text)
+      ? null
+      : 'GST format is invalid.';
+}
+
+String? _optionalPanValidator(String? value) {
+  final text = (value ?? '').trim().toUpperCase();
+  if (text.isEmpty) return null;
+  return RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$').hasMatch(text)
+      ? null
+      : 'PAN format is invalid.';
+}
+
+String? _blankToNull(String value) {
+  final text = value.trim().toUpperCase();
+  return text.isEmpty ? null : text;
+}

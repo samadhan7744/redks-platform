@@ -38,9 +38,35 @@ enum RiderStatus {
 }
 
 enum DeliveryMode {
+  REDKS
+  SELF
+  HYBRID
   REDKS_DELIVERY
   SELF_DELIVERY
   BOTH
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum ShopDocumentType {
+  GST
+  FSSAI
+  UDYAM
+  PAN
+  AADHAAR
+  SHOP_PHOTO
+  OTHER
+}
+
+enum ShopDocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum AddressType {
@@ -130,49 +156,50 @@ enum QuoteStatus {
 }
 
 model User {
-  id             String           @id @default(cuid())
-  phone          String           @unique
-  email          String?          @unique
+  id             String         @id @default(cuid())
+  phone          String         @unique
+  email          String?        @unique
   name           String?
-  roles          UserRole[]       @default([CUSTOMER])
-  status         UserStatus       @default(ACTIVE)
+  roles          UserRole[]     @default([CUSTOMER])
+  status         UserStatus     @default(ACTIVE)
   lastLoginAt    DateTime?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   addresses      Address[]
-  ownedShops     Shop[]           @relation("ShopOwner")
+  ownedShops     Shop[]         @relation("ShopOwner")
   riderProfile   RiderProfile?
-  orders         Order[]          @relation("CustomerOrders")
+  orders         Order[]        @relation("CustomerOrders")
   reviews        Review[]
   itemRequests   ItemRequest[]
   notifications  Notification[]
-  approvedShops  Shop[]           @relation("ShopApprovedBy")
-  approvedRiders RiderProfile[]   @relation("RiderApprovedBy")
+  approvedShops  Shop[]         @relation("ShopApprovedBy")
+  approvedRiders RiderProfile[] @relation("RiderApprovedBy")
 
   @@index([phone])
+  @@index([roles], type: Gin)
   @@index([status])
 }
 
 model Address {
-  id          String      @id @default(cuid())
-  userId      String
-  type        AddressType @default(HOME)
-  label       String?
-  line1       String
-  line2       String?
-  landmark    String?
-  cityId      String
-  zoneId      String?
-  pincode     String
-  latitude    Decimal?    @db.Decimal(10, 7)
-  longitude   Decimal?    @db.Decimal(10, 7)
-  isDefault   Boolean     @default(false)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  user        User        @relation(fields: [userId], references: [id])
-  city        City        @relation(fields: [cityId], references: [id])
-  zone        Zone?       @relation(fields: [zoneId], references: [id])
-  orders      Order[]
+  id        String      @id @default(cuid())
+  userId    String
+  type      AddressType @default(HOME)
+  label     String?
+  line1     String
+  line2     String?
+  landmark  String?
+  cityId    String
+  zoneId    String?
+  pincode   String
+  latitude  Decimal?    @db.Decimal(10, 7)
+  longitude Decimal?    @db.Decimal(10, 7)
+  isDefault Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id])
+  city      City        @relation(fields: [cityId], references: [id])
+  zone      Zone?       @relation(fields: [zoneId], references: [id])
+  orders    Order[]
 
   @@index([userId])
   @@index([cityId, zoneId])
@@ -196,18 +223,18 @@ model City {
 }
 
 model Zone {
-  id                  String    @id @default(cuid())
+  id                  String         @id @default(cuid())
   cityId              String
   name                String
   slug                String
-  isActive            Boolean   @default(true)
-  baseDeliveryFee     Decimal   @default(30) @db.Decimal(10, 2)
-  freeDeliveryAbove   Decimal?  @db.Decimal(10, 2)
-  estimatedMinutesMin Int       @default(20)
-  estimatedMinutesMax Int       @default(45)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  city                City      @relation(fields: [cityId], references: [id])
+  isActive            Boolean        @default(true)
+  baseDeliveryFee     Decimal        @default(30) @db.Decimal(10, 2)
+  freeDeliveryAbove   Decimal?       @db.Decimal(10, 2)
+  estimatedMinutesMin Int            @default(20)
+  estimatedMinutesMax Int            @default(45)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  city                City           @relation(fields: [cityId], references: [id])
   addresses           Address[]
   shops               Shop[]
   riderProfiles       RiderProfile[]
@@ -219,113 +246,150 @@ model Zone {
 }
 
 model Shop {
-  id                         String        @id @default(cuid())
-  ownerId                    String
-  cityId                     String
-  zoneId                     String
-  name                       String
-  slug                       String
-  description                String?
-  phone                      String
-  email                      String?
-  addressLine1               String
-  addressLine2               String?
-  landmark                   String?
-  pincode                    String
-  latitude                   Decimal?      @db.Decimal(10, 7)
-  longitude                  Decimal?      @db.Decimal(10, 7)
-  status                     ShopStatus    @default(PENDING_APPROVAL)
-  deliveryMode               DeliveryMode  @default(REDKS_DELIVERY)
-  defaultCommissionPercent   Decimal       @default(10) @db.Decimal(5, 2)
-  minOrderAmount             Decimal       @default(0) @db.Decimal(10, 2)
-  opensAt                    String?
-  closesAt                   String?
-  approvedById               String?
-  approvedAt                 DateTime?
-  rejectionReason            String?
-  createdAt                  DateTime      @default(now())
-  updatedAt                  DateTime      @updatedAt
-  owner                      User          @relation("ShopOwner", fields: [ownerId], references: [id])
-  city                       City          @relation(fields: [cityId], references: [id])
-  zone                       Zone          @relation(fields: [zoneId], references: [id])
-  approvedBy                 User?         @relation("ShopApprovedBy", fields: [approvedById], references: [id])
-  products                   Product[]
-  categories                 ShopCategory[]
-  categoryCommissions        ShopCategoryCommission[]
-  orders                     Order[]
-  reviews                    Review[]
-  itemRequests               ItemRequest[]
-  itemRequestQuotes          ItemRequestQuote[]
+  id                       String                   @id @default(cuid())
+  ownerId                  String
+  cityId                   String
+  zoneId                   String
+  categoryId               String?
+  ownerName                String?
+  ownerPhone               String?
+  shopName                 String?
+  name                     String
+  slug                     String
+  description              String?
+  phone                    String
+  email                    String?
+  addressLine1             String
+  addressLine2             String?
+  landmark                 String?
+  pincode                  String
+  latitude                 Decimal?                 @db.Decimal(10, 7)
+  longitude                Decimal?                 @db.Decimal(10, 7)
+  shopPhotoUrl             String?
+  upiId                    String?
+  gstNumber                String?
+  fssaiNumber              String?
+  udyamNumber              String?
+  panNumber                String?
+  status                   ShopStatus               @default(PENDING_APPROVAL)
+  verificationStatus       VerificationStatus       @default(PENDING)
+  deliveryMode             DeliveryMode             @default(REDKS_DELIVERY)
+  deliveryRadiusKm         Decimal?                 @db.Decimal(6, 2)
+  defaultCommissionPercent Decimal                  @default(10) @db.Decimal(5, 2)
+  commissionPercent        Decimal                  @default(10) @db.Decimal(5, 2)
+  minOrderAmount           Decimal                  @default(0) @db.Decimal(10, 2)
+  minOrderValue            Decimal                  @default(0) @db.Decimal(10, 2)
+  opensAt                  String?
+  closesAt                 String?
+  openingTime              String?
+  closingTime              String?
+  weeklyOffDay             String?
+  approvedById             String?
+  approvedAt               DateTime?
+  rejectionReason          String?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  owner                    User                     @relation("ShopOwner", fields: [ownerId], references: [id])
+  city                     City                     @relation(fields: [cityId], references: [id])
+  zone                     Zone                     @relation(fields: [zoneId], references: [id])
+  category                 Category?                @relation("PrimaryShopCategory", fields: [categoryId], references: [id])
+  approvedBy               User?                    @relation("ShopApprovedBy", fields: [approvedById], references: [id])
+  products                 Product[]
+  categories               ShopCategory[]
+  categoryCommissions      ShopCategoryCommission[]
+  documents                ShopDocument[]
+  orders                   Order[]
+  reviews                  Review[]
+  itemRequests             ItemRequest[]
+  itemRequestQuotes        ItemRequestQuote[]
 
   @@unique([cityId, slug])
   @@index([ownerId])
   @@index([cityId, zoneId])
   @@index([status])
   @@index([cityId, zoneId, status])
+  @@index([categoryId, status])
+  @@index([verificationStatus])
   @@index([deliveryMode, status])
 }
 
 model Category {
-  id                        String                   @id @default(cuid())
-  name                      String
-  slug                      String                   @unique
-  parentId                  String?
-  defaultCommissionPercent  Decimal                  @default(10) @db.Decimal(5, 2)
-  isActive                  Boolean                  @default(true)
-  createdAt                 DateTime                 @default(now())
-  updatedAt                 DateTime                 @updatedAt
-  parent                    Category?                @relation("CategoryTree", fields: [parentId], references: [id])
-  children                  Category[]               @relation("CategoryTree")
-  products                  Product[]
-  shops                     ShopCategory[]
-  shopCommissions           ShopCategoryCommission[]
+  id                       String                   @id @default(cuid())
+  name                     String
+  slug                     String                   @unique
+  parentId                 String?
+  defaultCommissionPercent Decimal                  @default(10) @db.Decimal(5, 2)
+  isActive                 Boolean                  @default(true)
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  parent                   Category?                @relation("CategoryTree", fields: [parentId], references: [id])
+  children                 Category[]               @relation("CategoryTree")
+  primaryShops             Shop[]                   @relation("PrimaryShopCategory")
+  products                 Product[]
+  shops                    ShopCategory[]
+  shopCommissions          ShopCategoryCommission[]
 
   @@index([parentId])
   @@index([isActive])
 }
 
+model ShopDocument {
+  id              String             @id @default(cuid())
+  shopId          String
+  type            ShopDocumentType
+  fileUrl         String
+  status          ShopDocumentStatus @default(PENDING)
+  rejectionReason String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  shop            Shop               @relation(fields: [shopId], references: [id])
+
+  @@index([shopId])
+  @@index([type, status])
+}
+
 model ShopCategory {
-  shopId      String
-  categoryId  String
-  createdAt   DateTime @default(now())
-  shop        Shop     @relation(fields: [shopId], references: [id])
-  category    Category @relation(fields: [categoryId], references: [id])
+  shopId     String
+  categoryId String
+  createdAt  DateTime @default(now())
+  shop       Shop     @relation(fields: [shopId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id])
 
   @@id([shopId, categoryId])
 }
 
 model ShopCategoryCommission {
-  id                  String    @id @default(cuid())
-  shopId              String
-  categoryId          String
-  commissionPercent   Decimal   @db.Decimal(5, 2)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  shop                Shop      @relation(fields: [shopId], references: [id])
-  category            Category  @relation(fields: [categoryId], references: [id])
+  id                String   @id @default(cuid())
+  shopId            String
+  categoryId        String
+  commissionPercent Decimal  @db.Decimal(5, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  shop              Shop     @relation(fields: [shopId], references: [id])
+  category          Category @relation(fields: [categoryId], references: [id])
 
   @@unique([shopId, categoryId])
   @@index([categoryId])
 }
 
 model Product {
-  id              String        @id @default(cuid())
-  shopId          String
-  categoryId      String
-  name            String
-  slug            String
-  description     String?
-  price           Decimal       @db.Decimal(10, 2)
-  mrp             Decimal?      @db.Decimal(10, 2)
-  stock           Int           @default(0)
-  unit            String        @default("piece")
-  imageUrl        String?
-  status          ProductStatus @default(ACTIVE)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  shop            Shop          @relation(fields: [shopId], references: [id])
-  category        Category      @relation(fields: [categoryId], references: [id])
-  orderItems      OrderItem[]
+  id          String        @id @default(cuid())
+  shopId      String
+  categoryId  String
+  name        String
+  slug        String
+  description String?
+  price       Decimal       @db.Decimal(10, 2)
+  mrp         Decimal?      @db.Decimal(10, 2)
+  stock       Int           @default(0)
+  unit        String        @default("piece")
+  imageUrl    String?
+  status      ProductStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  shop        Shop          @relation(fields: [shopId], references: [id])
+  category    Category      @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
 
   @@unique([shopId, slug])
   @@index([shopId])
@@ -336,29 +400,29 @@ model Product {
 }
 
 model RiderProfile {
-  id                 String                   @id @default(cuid())
-  userId             String                   @unique
+  id                 String                  @id @default(cuid())
+  userId             String                  @unique
   cityId             String
   zoneId             String?
-  status             RiderStatus              @default(PENDING_APPROVAL)
-  availabilityStatus RiderAvailabilityStatus  @default(OFFLINE)
+  status             RiderStatus             @default(PENDING_APPROVAL)
+  availabilityStatus RiderAvailabilityStatus @default(OFFLINE)
   vehicleType        String?
   vehicleNumber      String?
   drivingLicenseUrl  String?
-  currentLatitude    Decimal?                 @db.Decimal(10, 7)
-  currentLongitude   Decimal?                 @db.Decimal(10, 7)
+  currentLatitude    Decimal?                @db.Decimal(10, 7)
+  currentLongitude   Decimal?                @db.Decimal(10, 7)
   lastAvailableAt    DateTime?
   approvedById       String?
   approvedAt         DateTime?
   rejectionReason    String?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  user               User                     @relation(fields: [userId], references: [id])
-  city               City                     @relation(fields: [cityId], references: [id])
-  zone               Zone?                    @relation(fields: [zoneId], references: [id])
-  approvedBy         User?                    @relation("RiderApprovedBy", fields: [approvedById], references: [id])
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  user               User                    @relation(fields: [userId], references: [id])
+  city               City                    @relation(fields: [cityId], references: [id])
+  zone               Zone?                   @relation(fields: [zoneId], references: [id])
+  approvedBy         User?                   @relation("RiderApprovedBy", fields: [approvedById], references: [id])
   deliveries         Delivery[]
-  assignedOrders     Order[]                  @relation("AssignedRiderOrders")
+  assignedOrders     Order[]                 @relation("AssignedRiderOrders")
 
   @@index([cityId, zoneId, status])
   @@index([availabilityStatus, zoneId])
@@ -366,36 +430,36 @@ model RiderProfile {
 }
 
 model Order {
-  id                  String         @id @default(cuid())
-  orderNumber         String         @unique
-  customerId          String
-  shopId              String
-  riderId             String?
-  addressId           String
-  status              OrderStatus    @default(PLACED)
-  paymentMethod       PaymentMethod  @default(COD)
-  paymentStatus       PaymentStatus  @default(PENDING)
-  subtotal            Decimal        @db.Decimal(10, 2)
-  deliveryFee         Decimal        @default(0) @db.Decimal(10, 2)
-  platformFee         Decimal        @default(0) @db.Decimal(10, 2)
-  discountAmount      Decimal        @default(0) @db.Decimal(10, 2)
-  totalAmount         Decimal        @db.Decimal(10, 2)
-  commissionPercent   Decimal        @default(10) @db.Decimal(5, 2)
-  commissionAmount    Decimal        @default(0) @db.Decimal(10, 2)
-  customerNote        String?
-  cancellationReason  String?
-  placedAt            DateTime       @default(now())
-  deliveredAt         DateTime?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  customer            User           @relation("CustomerOrders", fields: [customerId], references: [id])
-  shop                Shop           @relation(fields: [shopId], references: [id])
-  rider               RiderProfile?  @relation("AssignedRiderOrders", fields: [riderId], references: [id])
-  address             Address        @relation(fields: [addressId], references: [id])
-  items               OrderItem[]
-  delivery            Delivery?
-  payment             Payment?
-  review              Review?
+  id                 String        @id @default(cuid())
+  orderNumber        String        @unique
+  customerId         String
+  shopId             String
+  riderId            String?
+  addressId          String
+  status             OrderStatus   @default(PLACED)
+  paymentMethod      PaymentMethod @default(COD)
+  paymentStatus      PaymentStatus @default(PENDING)
+  subtotal           Decimal       @db.Decimal(10, 2)
+  deliveryFee        Decimal       @default(0) @db.Decimal(10, 2)
+  platformFee        Decimal       @default(0) @db.Decimal(10, 2)
+  discountAmount     Decimal       @default(0) @db.Decimal(10, 2)
+  totalAmount        Decimal       @db.Decimal(10, 2)
+  commissionPercent  Decimal       @default(10) @db.Decimal(5, 2)
+  commissionAmount   Decimal       @default(0) @db.Decimal(10, 2)
+  customerNote       String?
+  cancellationReason String?
+  placedAt           DateTime      @default(now())
+  deliveredAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  customer           User          @relation("CustomerOrders", fields: [customerId], references: [id])
+  shop               Shop          @relation(fields: [shopId], references: [id])
+  rider              RiderProfile? @relation("AssignedRiderOrders", fields: [riderId], references: [id])
+  address            Address       @relation(fields: [addressId], references: [id])
+  items              OrderItem[]
+  delivery           Delivery?
+  payment            Payment?
+  review             Review?
 
   @@index([customerId])
   @@index([shopId])
@@ -409,34 +473,34 @@ model Order {
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
-  orderId     String
-  productId   String
-  name        String
-  quantity    Int
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  lineTotal   Decimal  @db.Decimal(10, 2)
-  order       Order    @relation(fields: [orderId], references: [id])
-  product     Product  @relation(fields: [productId], references: [id])
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  name      String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  lineTotal Decimal @db.Decimal(10, 2)
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
   @@index([productId])
 }
 
 model Delivery {
-  id                  String          @id @default(cuid())
-  orderId             String          @unique
-  riderId             String?
-  status              DeliveryStatus  @default(PENDING)
-  pickupOtp           String?
-  dropOtp             String?
-  assignedAt          DateTime?
-  pickedUpAt          DateTime?
-  deliveredAt         DateTime?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  order               Order           @relation(fields: [orderId], references: [id])
-  rider               RiderProfile?   @relation(fields: [riderId], references: [id])
+  id          String         @id @default(cuid())
+  orderId     String         @unique
+  riderId     String?
+  status      DeliveryStatus @default(PENDING)
+  pickupOtp   String?
+  dropOtp     String?
+  assignedAt  DateTime?
+  pickedUpAt  DateTime?
+  deliveredAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  order       Order          @relation(fields: [orderId], references: [id])
+  rider       RiderProfile?  @relation(fields: [riderId], references: [id])
 
   @@index([riderId])
   @@index([status])
@@ -445,16 +509,16 @@ model Delivery {
 }
 
 model Payment {
-  id                String         @id @default(cuid())
-  orderId           String         @unique
+  id                String        @id @default(cuid())
+  orderId           String        @unique
   method            PaymentMethod
-  status            PaymentStatus  @default(PENDING)
+  status            PaymentStatus @default(PENDING)
   provider          String?
   providerPaymentId String?
-  amount            Decimal        @db.Decimal(10, 2)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  order             Order          @relation(fields: [orderId], references: [id])
+  amount            Decimal       @db.Decimal(10, 2)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  order             Order         @relation(fields: [orderId], references: [id])
 
   @@index([status])
   @@index([method, status])
@@ -462,50 +526,50 @@ model Payment {
 }
 
 model Notification {
-  id         String    @id @default(cuid())
-  userId     String
-  title      String
-  body       String
-  channel    String    @default("IN_APP")
-  readAt     DateTime?
-  createdAt  DateTime  @default(now())
-  user       User      @relation(fields: [userId], references: [id])
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  channel   String    @default("IN_APP")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
 
 model Review {
-  id         String    @id @default(cuid())
-  orderId    String    @unique
-  shopId     String
-  userId     String
-  rating     Int
-  comment    String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  order      Order     @relation(fields: [orderId], references: [id])
-  shop       Shop      @relation(fields: [shopId], references: [id])
-  user       User      @relation(fields: [userId], references: [id])
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  shopId    String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id])
+  shop      Shop     @relation(fields: [shopId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([shopId])
   @@index([userId])
 }
 
 model ItemRequest {
-  id           String        @id @default(cuid())
+  id           String             @id @default(cuid())
   customerId   String
   cityId       String
   zoneId       String?
   shopId       String?
   description  String
-  status       ItemRequestStatus @default(OPEN)
-  quotedAmount Decimal?      @db.Decimal(10, 2)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  customer     User          @relation(fields: [customerId], references: [id])
-  city         City          @relation(fields: [cityId], references: [id])
-  zone         Zone?         @relation(fields: [zoneId], references: [id])
-  shop         Shop?         @relation(fields: [shopId], references: [id])
+  status       ItemRequestStatus  @default(OPEN)
+  quotedAmount Decimal?           @db.Decimal(10, 2)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  customer     User               @relation(fields: [customerId], references: [id])
+  city         City               @relation(fields: [cityId], references: [id])
+  zone         Zone?              @relation(fields: [zoneId], references: [id])
+  shop         Shop?              @relation(fields: [shopId], references: [id])
   quotes       ItemRequestQuote[]
 
   @@index([customerId])
@@ -516,18 +580,18 @@ model ItemRequest {
 }
 
 model ItemRequestQuote {
-  id            String       @id @default(cuid())
+  id            String      @id @default(cuid())
   itemRequestId String
   shopId        String?
-  status        QuoteStatus  @default(DRAFT)
-  amount        Decimal      @db.Decimal(10, 2)
+  status        QuoteStatus @default(DRAFT)
+  amount        Decimal     @db.Decimal(10, 2)
   note          String?
   expiresAt     DateTime?
   acceptedAt    DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  itemRequest   ItemRequest  @relation(fields: [itemRequestId], references: [id])
-  shop          Shop?        @relation(fields: [shopId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  itemRequest   ItemRequest @relation(fields: [itemRequestId], references: [id])
+  shop          Shop?       @relation(fields: [shopId], references: [id])
 
   @@index([itemRequestId, status])
   @@index([shopId, status])

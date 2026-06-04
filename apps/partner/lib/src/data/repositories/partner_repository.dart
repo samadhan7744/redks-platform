@@ -74,6 +74,16 @@ class PartnerRepository {
         client.unwrap(await client.dio.patch('/shops/my-shop', data: data))
             as Map<String, dynamic>,
       );
+  Future<List<ShopDocumentModel>> myShopDocuments() async => client
+      .list(await client.dio.get('/shops/my-shop/documents'))
+      .map(ShopDocumentModel.fromJson)
+      .toList();
+  Future<ShopDocumentModel> createShopDocument(
+    Map<String, dynamic> data,
+  ) async => ShopDocumentModel.fromJson(
+    client.unwrap(await client.dio.post('/shops/my-shop/documents', data: data))
+        as Map<String, dynamic>,
+  );
 
   Future<List<ProductModel>> myProducts() async => client
       .list(await client.dio.get('/products/my-products'))

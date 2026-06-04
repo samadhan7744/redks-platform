@@ -11,6 +11,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "test": "tsx test/order-calculation.test.ts",
+    "health:perf": "tsx scripts/health-perf.ts",
     "lint": "eslint \"{src,prisma,test}/**/*.ts\" --fix",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

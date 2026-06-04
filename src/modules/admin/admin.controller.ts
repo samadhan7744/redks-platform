@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -12,6 +20,8 @@ import { AdminRiderQueryDto } from './dto/admin-rider-query.dto';
 import { AdminShopQueryDto } from './dto/admin-shop-query.dto';
 import { RejectShopDto } from './dto/reject-shop.dto';
 import { AdminService } from './admin.service';
+import { UpdateShopCommissionDto } from './dto/update-shop-commission.dto';
+import { UpdateShopDocumentStatusDto } from './dto/update-shop-document-status.dto';
 import { UpdateRiderStatusDto } from './dto/update-rider-status.dto';
 
 @ApiTags('Admin')
@@ -32,19 +42,45 @@ export class AdminController {
     return this.adminService.findShops(query);
   }
 
+  @Get('shops/:id')
+  shop(@Param('id') id: string) {
+    return this.adminService.findShopById(id);
+  }
+
   @Patch('shops/:id/approve')
   approveShop(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.adminService.approveShop(user.sub, id);
   }
 
   @Patch('shops/:id/reject')
-  rejectShop(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: RejectShopDto) {
+  rejectShop(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RejectShopDto,
+  ) {
     return this.adminService.rejectShop(user.sub, id, dto.reason);
   }
 
   @Patch('shops/:id/suspend')
   suspendShop(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.adminService.suspendShop(user.sub, id);
+  }
+
+  @Patch('shops/:id/commission')
+  updateShopCommission(
+    @Param('id') id: string,
+    @Body() dto: UpdateShopCommissionDto,
+  ) {
+    return this.adminService.updateShopCommission(id, dto);
+  }
+
+  @Patch('shops/:id/documents/:documentId/status')
+  updateShopDocumentStatus(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @Body() dto: UpdateShopDocumentStatusDto,
+  ) {
+    return this.adminService.updateShopDocumentStatus(id, documentId, dto);
   }
 
   @Get('riders/pending')

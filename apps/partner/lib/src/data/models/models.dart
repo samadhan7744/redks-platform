@@ -43,27 +43,73 @@ class ShopModel {
     required this.name,
     required this.status,
     this.phone,
+    this.ownerName,
+    this.ownerPhone,
+    this.category,
     this.city,
     this.zone,
+    this.rejectionReason,
+    this.verificationStatus,
+    this.documents = const [],
   });
   final String id;
   final String name;
   final String status;
   final String? phone;
+  final String? ownerName;
+  final String? ownerPhone;
+  final CategoryModel? category;
   final CityModel? city;
   final ZoneModel? zone;
+  final String? rejectionReason;
+  final String? verificationStatus;
+  final List<ShopDocumentModel> documents;
   factory ShopModel.fromJson(Map<String, dynamic> json) => ShopModel(
     id: json['id']?.toString() ?? '',
-    name: json['name']?.toString() ?? '',
+    name: json['shopName']?.toString() ?? json['name']?.toString() ?? '',
     status: json['status']?.toString() ?? '',
-    phone: json['phone']?.toString(),
+    phone: json['ownerPhone']?.toString() ?? json['phone']?.toString(),
+    ownerName: json['ownerName']?.toString(),
+    ownerPhone: json['ownerPhone']?.toString(),
+    category: json['category'] is Map<String, dynamic>
+        ? CategoryModel.fromJson(json['category'])
+        : null,
     city: json['city'] is Map<String, dynamic>
         ? CityModel.fromJson(json['city'])
         : null,
     zone: json['zone'] is Map<String, dynamic>
         ? ZoneModel.fromJson(json['zone'])
         : null,
+    rejectionReason: json['rejectionReason']?.toString(),
+    verificationStatus: json['verificationStatus']?.toString(),
+    documents: ((json['documents'] as List?) ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(ShopDocumentModel.fromJson)
+        .toList(),
   );
+}
+
+class ShopDocumentModel {
+  ShopDocumentModel({
+    required this.id,
+    required this.type,
+    required this.fileUrl,
+    required this.status,
+    this.rejectionReason,
+  });
+  final String id;
+  final String type;
+  final String fileUrl;
+  final String status;
+  final String? rejectionReason;
+  factory ShopDocumentModel.fromJson(Map<String, dynamic> json) =>
+      ShopDocumentModel(
+        id: json['id']?.toString() ?? '',
+        type: json['type']?.toString() ?? '',
+        fileUrl: json['fileUrl']?.toString() ?? '',
+        status: json['status']?.toString() ?? '',
+        rejectionReason: json['rejectionReason']?.toString(),
+      );
 }
 
 class CategoryModel {
