@@ -13,7 +13,7 @@ CREATE TABLE "RiderLocation" (
 );
 
 -- CreateIndex
-CREATE INDEX "RiderLocation_riderId_idx" ON "RiderLocation"("riderId");
+CREATE UNIQUE INDEX "RiderLocation_riderId_key" ON "RiderLocation"("riderId");
 
 -- CreateIndex
 CREATE INDEX "RiderLocation_recordedAt_idx" ON "RiderLocation"("recordedAt");

@@ -4,28 +4,34 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { UserRole } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
-import { PrismaService } from '../../prisma/prisma.service';
 import { AuthUser } from '../../common/types/auth-user.type';
+import { TrackingEventsService } from './tracking-events.service';
+import { TrackingService } from './tracking.service';
 
 @Injectable()
 @WebSocketGateway({
   namespace: '/tracking',
   cors: { origin: true, credentials: true },
 })
-export class TrackingGateway implements OnGatewayConnection {
+export class TrackingGateway implements OnGatewayConnection, OnGatewayInit {
   @WebSocketServer()
   server!: Server;
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService,
+    private readonly trackingService: TrackingService,
+    private readonly events: TrackingEventsService,
   ) {}
+
+  afterInit(server: Server) {
+    this.events.bindServer(server);
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -45,29 +51,16 @@ export class TrackingGateway implements OnGatewayConnection {
       client.emit('order.tracking.error', { message: 'Unauthorized' });
       return { ok: false };
     }
-    const allowed = await this.canTrackOrder(user, body.orderId);
+    const allowed = await this.trackingService.canAccessOrderTrackingById(
+      user,
+      body.orderId,
+    );
     if (!allowed) {
       client.emit('order.tracking.error', { message: 'Order access denied' });
       return { ok: false };
     }
-    await client.join(this.orderRoom(body.orderId));
-    return { ok: true, room: this.orderRoom(body.orderId) };
-  }
-
-  emitRiderLocationUpdated(orderId: string, payload: unknown) {
-    this.server
-      .to(this.orderRoom(orderId))
-      .emit('rider.location.updated', payload);
-  }
-
-  emitOrderTrackingUpdated(orderId: string, payload: unknown) {
-    this.server
-      .to(this.orderRoom(orderId))
-      .emit('order.tracking.updated', payload);
-  }
-
-  private orderRoom(orderId: string) {
-    return `order:${orderId}`;
+    await client.join(this.events.orderRoom(body.orderId));
+    return { ok: true, room: this.events.orderRoom(body.orderId) };
   }
 
   private async authenticate(client: Socket): Promise<AuthUser> {
@@ -76,24 +69,5 @@ export class TrackingGateway implements OnGatewayConnection {
       client.handshake.headers.authorization?.toString().replace(/^Bearer /i, '');
     if (!authToken) throw new Error('Missing token');
     return this.jwtService.verifyAsync(authToken);
-  }
-
-  private async canTrackOrder(user: AuthUser, orderId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        shop: { select: { ownerId: true } },
-        rider: { select: { userId: true } },
-      },
-    });
-    if (!order) return false;
-    if (order.customerId === user.sub) return true;
-    if (order.shop.ownerId === user.sub) return true;
-    if (order.rider?.userId === user.sub) return true;
-    const adminRoles: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
-    if (user.roles.some((role) => adminRoles.includes(role))) {
-      return true;
-    }
-    return false;
   }
 }

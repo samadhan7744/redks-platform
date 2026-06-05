@@ -1,5 +1,7 @@
 import {
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,20 +9,25 @@ import { OrderStatus, RiderStatus, UserRole } from '@prisma/client';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { ok } from '../../common/utils/api-response.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../redis/redis.service';
 import { UpdateRiderLocationDto } from './dto/update-rider-location.dto';
-import { TrackingGateway } from './tracking.gateway';
+import { TrackingEventsService } from './tracking-events.service';
 
 const trackableOrderStatuses: OrderStatus[] = [
   OrderStatus.ASSIGNED,
   OrderStatus.PICKED_UP,
+  // Existing RedKS rider pickup flow currently moves orders to OUT_FOR_DELIVERY.
   OrderStatus.OUT_FOR_DELIVERY,
 ];
+const minuteLocationLimit = 6;
+const hourLocationLimit = 60;
 
 @Injectable()
 export class TrackingService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly gateway: TrackingGateway,
+    private readonly events: TrackingEventsService,
+    private readonly redis: RedisService,
   ) {}
 
   async updateRiderLocation(userId: string, dto: UpdateRiderLocationDto) {
@@ -32,11 +39,27 @@ export class TrackingService {
       throw new ForbiddenException('Only approved riders can share location');
     }
 
+    await this.enforceLocationRateLimit(rider.id);
+    const activeOrders = await this.activeTrackingOrders(rider.id);
+    if (!activeOrders.length) {
+      throw new ForbiddenException(
+        'Location tracking is only allowed for active assigned orders',
+      );
+    }
+
     const recordedAt = new Date();
     const location = await this.prisma.$transaction(async (tx) => {
-      await tx.riderLocation.deleteMany({ where: { riderId: rider.id } });
-      const latest = await tx.riderLocation.create({
-        data: {
+      const latest = await tx.riderLocation.upsert({
+        where: { riderId: rider.id },
+        update: {
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          accuracy: dto.accuracy,
+          speed: dto.speed,
+          heading: dto.heading,
+          recordedAt,
+        },
+        create: {
           riderId: rider.id,
           latitude: dto.latitude,
           longitude: dto.longitude,
@@ -89,21 +112,15 @@ export class TrackingService {
       updatedAt: Date;
     },
   ) {
-    const activeOrders = await this.prisma.order.findMany({
-      where: {
-        riderId,
-        status: { in: trackableOrderStatuses },
-      },
-      select: { id: true },
-    });
+    const activeOrders = await this.activeTrackingOrders(riderId);
 
     for (const order of activeOrders) {
       const payload = {
         orderId: order.id,
         ...location,
       };
-      this.gateway.emitRiderLocationUpdated(order.id, payload);
-      this.gateway.emitOrderTrackingUpdated(order.id, payload);
+      this.events.emitRiderLocationUpdated(order.id, payload);
+      this.events.emitOrderTrackingUpdated(order.id, payload);
     }
   }
 
@@ -136,6 +153,59 @@ export class TrackingService {
       longitude: location ? Number(location.longitude) : null,
       updatedAt: location?.recordedAt ?? null,
     });
+  }
+
+  async canAccessOrderTrackingById(user: AuthUser, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        shop: { select: { ownerId: true } },
+        rider: { include: { user: { select: { id: true } } } },
+      },
+    });
+    if (!order) return false;
+    return this.canAccessOrderTracking(order, user);
+  }
+
+  async cleanupRetainedLocations(retainDays = 7) {
+    const cutoff = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000);
+    return this.prisma.riderLocation.deleteMany({
+      where: { recordedAt: { lt: cutoff } },
+    });
+  }
+
+  private activeTrackingOrders(riderId: string) {
+    return this.prisma.order.findMany({
+      where: {
+        riderId,
+        status: { in: trackableOrderStatuses },
+      },
+      select: { id: true },
+    });
+  }
+
+  private async enforceLocationRateLimit(riderId: string) {
+    const minuteCount = await this.redis.incrementWithTtl(
+      `tracking:location:${riderId}:minute`,
+      60,
+    );
+    if (minuteCount > minuteLocationLimit) {
+      throw new HttpException(
+        'Rider location rate limit exceeded',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const hourCount = await this.redis.incrementWithTtl(
+      `tracking:location:${riderId}:hour`,
+      60 * 60,
+    );
+    if (hourCount > hourLocationLimit) {
+      throw new HttpException(
+        'Rider location rate limit exceeded',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
   }
 
   private canAccessOrderTracking(

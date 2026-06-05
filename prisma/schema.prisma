@@ -644,7 +644,7 @@ model Order {
 
 model RiderLocation {
   id         String       @id @default(cuid())
-  riderId    String
+  riderId    String       @unique
   latitude   Decimal      @db.Decimal(10, 7)
   longitude  Decimal      @db.Decimal(10, 7)
   accuracy   Decimal?     @db.Decimal(10, 2)
@@ -653,7 +653,6 @@ model RiderLocation {
   recordedAt DateTime     @default(now())
   rider      RiderProfile @relation(fields: [riderId], references: [id])
 
-  @@index([riderId])
   @@index([recordedAt])
 }
 
