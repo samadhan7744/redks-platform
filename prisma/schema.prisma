@@ -245,8 +245,12 @@ model Address {
   userId    String
   type      AddressType @default(HOME)
   label     String?
+  recipientName String?
+  phone     String?
   line1     String
   line2     String?
+  addressLine1 String?
+  addressLine2 String?
   landmark  String?
   cityId    String
   zoneId    String?
@@ -262,6 +266,8 @@ model Address {
   orders    Order[]
 
   @@index([userId])
+  @@index([cityId])
+  @@index([zoneId])
   @@index([cityId, zoneId])
 }
 
@@ -336,6 +342,7 @@ model Shop {
   verificationStatus       VerificationStatus       @default(PENDING)
   deliveryMode             DeliveryMode             @default(REDKS_DELIVERY)
   deliveryRadiusKm         Decimal?                 @db.Decimal(6, 2)
+  serviceRadiusKm          Decimal?                 @db.Decimal(6, 2)
   defaultCommissionPercent Decimal                  @default(10) @db.Decimal(5, 2)
   commissionPercent        Decimal                  @default(10) @db.Decimal(5, 2)
   minOrderAmount           Decimal                  @default(0) @db.Decimal(10, 2)
@@ -373,7 +380,9 @@ model Shop {
   @@index([ownerId])
   @@index([cityId, zoneId])
   @@index([status])
+  @@index([zoneId])
   @@index([cityId, zoneId, status])
+  @@index([latitude, longitude])
   @@index([categoryId, status])
   @@index([verificationStatus])
   @@index([deliveryMode, status])

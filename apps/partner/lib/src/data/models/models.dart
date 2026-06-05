@@ -48,6 +48,9 @@ class ShopModel {
     this.category,
     this.city,
     this.zone,
+    this.latitude,
+    this.longitude,
+    this.serviceRadiusKm,
     this.rejectionReason,
     this.verificationStatus,
     this.documents = const [],
@@ -61,6 +64,9 @@ class ShopModel {
   final CategoryModel? category;
   final CityModel? city;
   final ZoneModel? zone;
+  final double? latitude;
+  final double? longitude;
+  final double? serviceRadiusKm;
   final String? rejectionReason;
   final String? verificationStatus;
   final List<ShopDocumentModel> documents;
@@ -80,6 +86,13 @@ class ShopModel {
     zone: json['zone'] is Map<String, dynamic>
         ? ZoneModel.fromJson(json['zone'])
         : null,
+    latitude: double.tryParse(json['latitude']?.toString() ?? ''),
+    longitude: double.tryParse(json['longitude']?.toString() ?? ''),
+    serviceRadiusKm: double.tryParse(
+      json['serviceRadiusKm']?.toString() ??
+          json['deliveryRadiusKm']?.toString() ??
+          '',
+    ),
     rejectionReason: json['rejectionReason']?.toString(),
     verificationStatus: json['verificationStatus']?.toString(),
     documents: ((json['documents'] as List?) ?? [])

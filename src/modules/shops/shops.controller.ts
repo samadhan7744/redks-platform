@@ -18,8 +18,10 @@ import { AuthUser } from '../../common/types/auth-user.type';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { CreateShopDocumentDto } from './dto/create-shop-document.dto';
 import { CreateShopRiderDto } from './dto/create-shop-rider.dto';
+import { NearbyShopsQueryDto } from './dto/nearby-shops-query.dto';
 import { ShopQueryDto } from './dto/shop-query.dto';
 import { UpdateMyShopStatusDto } from './dto/update-my-shop-status.dto';
+import { UpdateShopLocationDto } from './dto/update-shop-location.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { UpdateShopStatusDto } from './dto/update-shop-status.dto';
 import { ShopsService } from './shops.service';
@@ -32,6 +34,11 @@ export class ShopsController {
   @Get()
   findApproved(@Query() query: ShopQueryDto) {
     return this.shopsService.findPublic(query);
+  }
+
+  @Get('nearby')
+  nearby(@Query() query: NearbyShopsQueryDto) {
+    return this.shopsService.findNearby(query);
   }
 
   @Post('register')
@@ -112,6 +119,17 @@ export class ShopsController {
     return this.shopsService.updateMyStatus(user.sub, dto);
   }
 
+  @Patch('my-shop/location')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  updateMyLocation(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateShopLocationDto,
+  ) {
+    return this.shopsService.updateMyLocation(user.sub, dto);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.shopsService.findById(id);
@@ -127,5 +145,17 @@ export class ShopsController {
     @Body() dto: UpdateShopStatusDto,
   ) {
     return this.shopsService.updateStatus(user.sub, id, dto);
+  }
+
+  @Patch(':id/location')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  updateLocation(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateShopLocationDto,
+  ) {
+    return this.shopsService.updateLocation(user, id, dto);
   }
 }

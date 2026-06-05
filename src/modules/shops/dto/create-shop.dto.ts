@@ -3,6 +3,8 @@ import { DeliveryMode } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
+  IsLatitude,
+  IsLongitude,
   IsNumber,
   IsOptional,
   IsString,
@@ -67,13 +69,13 @@ export class CreateShopDto {
   @ApiPropertyOptional({ example: 12.971599 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsLatitude()
   latitude?: number;
 
   @ApiPropertyOptional({ example: 77.594566 })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsLongitude()
   longitude?: number;
 
   @ApiPropertyOptional({ example: 'https://example.com/shop.jpg' })
@@ -124,8 +126,16 @@ export class CreateShopDto {
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  @Max(50)
+  @Max(20)
   deliveryRadiusKm?: number;
+
+  @ApiPropertyOptional({ example: 5 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.1)
+  @Max(20)
+  serviceRadiusKm?: number;
 
   @ApiPropertyOptional({ example: 199 })
   @IsOptional()

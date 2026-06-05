@@ -68,6 +68,8 @@ class ShopModel {
     this.phone,
     this.city,
     this.zone,
+    this.distanceKm,
+    this.estimatedDeliveryMinutes,
   });
   final String id;
   final String name;
@@ -75,19 +77,30 @@ class ShopModel {
   final String? phone;
   final CityModel? city;
   final ZoneModel? zone;
+  final double? distanceKm;
+  final int? estimatedDeliveryMinutes;
 
-  factory ShopModel.fromJson(Map<String, dynamic> json) => ShopModel(
-    id: json['id']?.toString() ?? '',
-    name: json['name']?.toString() ?? '',
-    description: json['description']?.toString(),
-    phone: json['phone']?.toString(),
-    city: json['city'] is Map<String, dynamic>
-        ? CityModel.fromJson(json['city'])
+  factory ShopModel.fromJson(Map<String, dynamic> json) {
+    final shopJson = json['shop'] is Map<String, dynamic>
+        ? json['shop'] as Map<String, dynamic>
+        : json;
+    return ShopModel(
+    id: shopJson['id']?.toString() ?? '',
+    name: shopJson['name']?.toString() ?? '',
+    description: shopJson['description']?.toString(),
+    phone: shopJson['phone']?.toString(),
+    city: shopJson['city'] is Map<String, dynamic>
+        ? CityModel.fromJson(shopJson['city'])
         : null,
-    zone: json['zone'] is Map<String, dynamic>
-        ? ZoneModel.fromJson(json['zone'])
+    zone: shopJson['zone'] is Map<String, dynamic>
+        ? ZoneModel.fromJson(shopJson['zone'])
         : null,
+    distanceKm: double.tryParse(json['distanceKm']?.toString() ?? ''),
+    estimatedDeliveryMinutes: int.tryParse(
+      json['estimatedDeliveryMinutes']?.toString() ?? '',
+    ),
   );
+  }
 }
 
 class ProductModel {
@@ -137,6 +150,9 @@ class AddressModel {
     this.city,
     this.zone,
     this.landmark,
+    this.latitude,
+    this.longitude,
+    this.isDefault = false,
   });
   final String id;
   final String line1;
@@ -144,10 +160,14 @@ class AddressModel {
   final String? landmark;
   final CityModel? city;
   final ZoneModel? zone;
+  final double? latitude;
+  final double? longitude;
+  final bool isDefault;
 
   factory AddressModel.fromJson(Map<String, dynamic> json) => AddressModel(
     id: json['id']?.toString() ?? '',
-    line1: json['line1']?.toString() ?? '',
+    line1:
+        json['addressLine1']?.toString() ?? json['line1']?.toString() ?? '',
     pincode: json['pincode']?.toString() ?? '',
     landmark: json['landmark']?.toString(),
     city: json['city'] is Map<String, dynamic>
@@ -156,6 +176,9 @@ class AddressModel {
     zone: json['zone'] is Map<String, dynamic>
         ? ZoneModel.fromJson(json['zone'])
         : null,
+    latitude: double.tryParse(json['latitude']?.toString() ?? ''),
+    longitude: double.tryParse(json['longitude']?.toString() ?? ''),
+    isDefault: json['isDefault'] == true,
   );
 }
 

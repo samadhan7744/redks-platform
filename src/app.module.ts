@@ -10,6 +10,7 @@ import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
 import { ItemRequestsModule } from './modules/item-requests/item-requests.module';
 import { MediaModule } from './modules/media/media.module';
+import { MapsModule } from './modules/maps/maps.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -53,6 +54,7 @@ import { RedisModule } from './redis/redis.module';
     ProductsModule,
     OrdersModule,
     ItemRequestsModule,
+    MapsModule,
     MediaModule,
     DeliveryModule,
     PaymentsModule,

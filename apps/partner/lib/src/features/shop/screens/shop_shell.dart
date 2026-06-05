@@ -206,6 +206,8 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
   final _address1 = TextEditingController();
   final _address2 = TextEditingController();
   final _pincode = TextEditingController();
+  final _latitude = TextEditingController();
+  final _longitude = TextEditingController();
   final _upiId = TextEditingController();
   final _gst = TextEditingController();
   final _fssai = TextEditingController();
@@ -237,6 +239,9 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     _ownerPhone.text =
         widget.existing?.ownerPhone ?? widget.existing?.phone ?? '';
     _shopName.text = widget.existing?.name ?? '';
+    _latitude.text = widget.existing?.latitude?.toString() ?? '';
+    _longitude.text = widget.existing?.longitude?.toString() ?? '';
+    _radius.text = widget.existing?.serviceRadiusKm?.toString() ?? '5';
     _pincode.text = '560001';
     _cityId = widget.existing?.city?.id;
     _zoneId = widget.existing?.zone?.id;
@@ -252,6 +257,8 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
     _address1.dispose();
     _address2.dispose();
     _pincode.dispose();
+    _latitude.dispose();
+    _longitude.dispose();
     _upiId.dispose();
     _gst.dispose();
     _fssai.dispose();
@@ -311,6 +318,8 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       'addressLine1': _address1.text.trim(),
       'addressLine2': _address2.text.trim(),
       'pincode': _pincode.text.trim(),
+      'latitude': double.tryParse(_latitude.text.trim()),
+      'longitude': double.tryParse(_longitude.text.trim()),
       'upiId': _upiId.text.trim(),
       'gstNumber': _blankToNull(_gst.text),
       'fssaiNumber': _blankToNull(_fssai.text),
@@ -318,6 +327,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
       'shopPhotoUrl': _blankToNull(_photoUrl.text),
       'deliveryMode': _deliveryMode,
       'deliveryRadiusKm': double.tryParse(_radius.text.trim()) ?? 0,
+      'serviceRadiusKm': double.tryParse(_radius.text.trim()) ?? 0,
       'minOrderValue': double.tryParse(_minOrder.text.trim()) ?? 0,
       'openingTime': _opening.text.trim(),
       'closingTime': _closing.text.trim(),
@@ -535,6 +545,26 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
         ],
         validator: _pincodeValidator,
       ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _latitude,
+        decoration: const InputDecoration(
+          labelText: 'Latitude',
+          helperText: 'Use Google Maps dropped pin coordinates for now.',
+        ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: _number,
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        controller: _longitude,
+        decoration: const InputDecoration(
+          labelText: 'Longitude',
+          helperText: 'Map picker integration can replace this field later.',
+        ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: _number,
+      ),
     ],
   );
 
@@ -677,6 +707,7 @@ class _ShopFormScreenState extends ConsumerState<ShopFormScreen> {
           const SizedBox(height: 8),
           Text('Owner: ${_ownerName.text} / ${_ownerPhone.text}'),
           Text('Address: ${_address1.text}, ${_pincode.text}'),
+          Text('Location: ${_latitude.text}, ${_longitude.text}'),
           Text('UPI: ${_upiId.text}'),
           Text('Delivery: $_deliveryMode, ${_radius.text} km'),
           Text(

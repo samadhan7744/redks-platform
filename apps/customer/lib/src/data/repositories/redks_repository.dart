@@ -80,6 +80,22 @@ class RedKsRepository {
     return _list(response).map(ShopModel.fromJson).toList();
   }
 
+  Future<List<ShopModel>> nearbyShops({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 5,
+  }) async {
+    final response = await client.dio.get(
+      '/shops/nearby',
+      queryParameters: {
+        'lat': latitude,
+        'lng': longitude,
+        'radiusKm': radiusKm,
+      },
+    );
+    return _list(response).map(ShopModel.fromJson).toList();
+  }
+
   Future<List<ProductModel>> products({
     String? shopId,
     String? categoryId,
@@ -98,7 +114,7 @@ class RedKsRepository {
   }
 
   Future<List<AddressModel>> addresses() async {
-    final response = await client.dio.get('/addresses');
+    final response = await client.dio.get('/me/addresses');
     return _list(response).map(AddressModel.fromJson).toList();
   }
 
@@ -108,20 +124,30 @@ class RedKsRepository {
     required String cityId,
     String? zoneId,
     String? landmark,
+    double? latitude,
+    double? longitude,
+    bool isDefault = false,
   }) async {
     final response = await client.dio.post(
-      '/addresses',
+      '/me/addresses',
       data: {
-        'line1': line1,
+        'addressLine1': line1,
         'pincode': pincode,
         'cityId': cityId,
         'zoneId': zoneId,
         'landmark': landmark,
+        'latitude': latitude,
+        'longitude': longitude,
+        'isDefault': isDefault,
       }..removeWhere((_, value) => value == null || value == ''),
     );
     return AddressModel.fromJson(
       client.unwrap(response) as Map<String, dynamic>,
     );
+  }
+
+  Future<void> setDefaultAddress(String id) async {
+    await client.dio.patch('/me/addresses/$id/default');
   }
 
   Future<OrderModel> createOrder({

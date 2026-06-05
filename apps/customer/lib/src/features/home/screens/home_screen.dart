@@ -7,6 +7,7 @@ import '../../../core/widgets/redks_app_bar.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repositories/redks_repository.dart';
 import '../../cart/cart_controller.dart';
+import '../../cart/screens/checkout_screen.dart';
 import '../../cart/screens/cart_screen.dart';
 import '../../item_requests/screens/item_requests_screen.dart';
 import '../../location/location_controller.dart';
@@ -21,6 +22,20 @@ final shopsProvider = FutureProvider.autoDispose<List<ShopModel>>((ref) {
   final repo = ref.watch(redKsRepositoryProvider);
   final city = ref.watch(selectedCityProvider);
   final zone = ref.watch(selectedZoneProvider);
+  final addresses = ref.watch(addressesProvider).valueOrNull;
+  AddressModel? selectedAddress;
+  for (final address in addresses ?? const <AddressModel>[]) {
+    if (address.isDefault) {
+      selectedAddress = address;
+      break;
+    }
+  }
+  if (selectedAddress?.latitude != null && selectedAddress?.longitude != null) {
+    return repo.nearbyShops(
+      latitude: selectedAddress!.latitude!,
+      longitude: selectedAddress.longitude!,
+    );
+  }
   return repo.shops(cityId: city?.id, zoneId: zone?.id);
 });
 
