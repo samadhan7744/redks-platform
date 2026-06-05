@@ -2,9 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { ShoppingBag } from 'lucide-react';
+import { ShieldCheck, ShoppingBag } from 'lucide-react';
 import { api, getErrorMessage, unwrap } from '@/lib/api';
-import { env } from '@/lib/env';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +32,7 @@ export default function LoginPage() {
   const [resendIn, setResendIn] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [online, setOnline] = useState(true);
 
   useEffect(() => {
     if (!resendIn) return;
@@ -42,6 +42,17 @@ export default function LoginPage() {
     );
     return () => window.clearInterval(timer);
   }, [resendIn]);
+
+  useEffect(() => {
+    setOnline(window.navigator.onLine);
+    const update = () => setOnline(window.navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
 
   async function requestOtp(event: FormEvent) {
     event.preventDefault();
@@ -86,11 +97,11 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="min-h-screen bg-[#111827] text-white">
       <div className="grid min-h-screen lg:grid-cols-[1fr_480px]">
         <section className="flex flex-col justify-between p-8 lg:p-12">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary shadow-lg shadow-red-950/30">
               <ShoppingBag className="h-5 w-5" />
             </div>
             <div>
@@ -101,21 +112,25 @@ export default function LoginPage() {
             </div>
           </div>
           <div className="max-w-2xl py-12">
-            <h1 className="text-4xl font-semibold tracking-normal sm:text-5xl">
-              Operations control for local commerce.
+            <h1 className="text-4xl font-black tracking-normal sm:text-5xl">
+              Control room for local commerce.
             </h1>
             <p className="mt-4 max-w-xl text-base text-slate-300">
               Manage approvals, city operations, orders, riders, products, and
               customer requests from one focused admin surface.
             </p>
           </div>
-          <div className="text-sm text-slate-400">
-            Backend: {env.apiBaseUrl}
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
+            <span className={online ? 'h-2 w-2 rounded-full bg-emerald-400' : 'h-2 w-2 rounded-full bg-red-400'} />
+            {online ? 'Connected' : 'Offline'}
           </div>
         </section>
-        <section className="flex items-center bg-white p-6 text-slate-950 lg:p-10">
-          <Card className="w-full">
+        <section className="flex items-center bg-[#F8F9FA] p-6 text-slate-950 lg:p-10">
+          <Card className="w-full border-slate-200 shadow-xl shadow-slate-900/10">
             <CardHeader>
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-primary">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
               <CardTitle>Admin login</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Use the OTP flow configured in the RedKS backend.

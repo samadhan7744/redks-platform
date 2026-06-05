@@ -30,7 +30,10 @@ export class DeliveryController {
 
   @Patch('rider/availability')
   @Roles(UserRole.RIDER)
-  updateAvailability(@CurrentUser() user: AuthUser, @Body() dto: UpdateRiderAvailabilityDto) {
+  updateAvailability(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateRiderAvailabilityDto,
+  ) {
     return this.deliveryService.updateAvailability(user.sub, dto);
   }
 }

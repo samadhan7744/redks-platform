@@ -9,11 +9,13 @@ import { CitiesModule } from './modules/cities/cities.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
 import { ItemRequestsModule } from './modules/item-requests/item-requests.module';
+import { MediaModule } from './modules/media/media.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { ProductsModule } from './modules/products/products.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { RidersModule } from './modules/riders/riders.module';
 import { ShopsModule } from './modules/shops/shops.module';
 import { UsersModule } from './modules/users/users.module';
 import { ZonesModule } from './modules/zones/zones.module';
@@ -30,7 +32,10 @@ import { RedisModule } from './redis/redis.module';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET', 'dev-secret'),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '7d') as JwtSignOptions['expiresIn'],
+          expiresIn: configService.get<string>(
+            'JWT_EXPIRES_IN',
+            '7d',
+          ) as JwtSignOptions['expiresIn'],
         },
       }),
     }),
@@ -47,10 +52,12 @@ import { RedisModule } from './redis/redis.module';
     ProductsModule,
     OrdersModule,
     ItemRequestsModule,
+    MediaModule,
     DeliveryModule,
     PaymentsModule,
     NotificationsModule,
     ReviewsModule,
+    RidersModule,
     AdminModule,
   ],
 })

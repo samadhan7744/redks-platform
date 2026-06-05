@@ -10,12 +10,18 @@ import {
   PaymentMethod,
   PaymentStatus,
   ProductStatus,
+  RiderAssignmentAttemptStatus,
   RiderAvailabilityStatus,
   RiderStatus,
   UserRole,
 } from '@prisma/client';
 import { AuthUser } from '../../common/types/auth-user.type';
-import { ok, paginated, paginationParams } from '../../common/utils/api-response.util';
+import {
+  ok,
+  paginated,
+  paginationParams,
+} from '../../common/utils/api-response.util';
+import { AssignmentService } from '../assignment/assignment.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -27,6 +33,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly calculator: OrderCalculationService,
+    private readonly assignmentService: AssignmentService,
   ) {}
 
   async create(customerId: string, dto: CreateOrderDto) {
@@ -39,20 +46,32 @@ export class OrdersService {
           status: ProductStatus.ACTIVE,
         },
       }),
-      this.prisma.shop.findUnique({ where: { id: dto.shopId }, include: { zone: true } }),
-      this.prisma.address.findFirst({ where: { id: dto.addressId, userId: customerId } }),
+      this.prisma.shop.findUnique({
+        where: { id: dto.shopId },
+        include: { zone: true },
+      }),
+      this.prisma.address.findFirst({
+        where: { id: dto.addressId, userId: customerId },
+      }),
     ]);
 
     if (!shop) throw new NotFoundException('Shop not found');
-    if (!address) throw new BadRequestException('Address does not belong to this customer');
+    if (!address)
+      throw new BadRequestException('Address does not belong to this customer');
     if (products.length !== productIds.length) {
-      throw new BadRequestException('One or more products are invalid for this shop');
+      throw new BadRequestException(
+        'One or more products are invalid for this shop',
+      );
     }
 
     const orderItems = dto.items.map((item) => {
-      const product = products.find((candidate) => candidate.id === item.productId);
+      const product = products.find(
+        (candidate) => candidate.id === item.productId,
+      );
       if (!product || product.stock < item.quantity) {
-        throw new BadRequestException(`Insufficient stock for product ${item.productId}`);
+        throw new BadRequestException(
+          `Insufficient stock for product ${item.productId}`,
+        );
       }
 
       const unitPrice = Number(product.price);
@@ -145,7 +164,10 @@ export class OrdersService {
   }
 
   async findAll(query: OrderQueryDto) {
-    const { page, limit, skip, take } = paginationParams(query.page, query.limit);
+    const { page, limit, skip, take } = paginationParams(
+      query.page,
+      query.limit,
+    );
     const where = {
       customerId: query.customerId,
       shopId: query.shopId,
@@ -154,43 +176,83 @@ export class OrdersService {
       paymentMethod: query.paymentMethod,
       paymentStatus: query.paymentStatus,
       OR: query.search
-        ? [{ orderNumber: { contains: query.search, mode: 'insensitive' as const } }]
+        ? [
+            {
+              orderNumber: {
+                contains: query.search,
+                mode: 'insensitive' as const,
+              },
+            },
+          ]
         : undefined,
     };
     const [data, total] = await this.prisma.$transaction([
-      this.prisma.order.findMany({ where, skip, take, include: this.orderInclude(), orderBy: { placedAt: 'desc' } }),
+      this.prisma.order.findMany({
+        where,
+        skip,
+        take,
+        include: this.orderInclude(),
+        orderBy: { placedAt: 'desc' },
+      }),
       this.prisma.order.count({ where }),
     ]);
     return paginated(data, total, page, limit);
   }
 
   async findById(id: string) {
-    const order = await this.prisma.order.findUnique({ where: { id }, include: this.orderInclude() });
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: this.orderInclude(),
+    });
     if (!order) throw new NotFoundException('Order not found');
     return ok(order);
   }
 
   async findForActor(user: AuthUser, orderId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: this.orderInclude() });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: this.orderInclude(),
+    });
     if (!order) throw new NotFoundException('Order not found');
     const adminRoles: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
     if (user.roles.some((role) => adminRoles.includes(role))) return ok(order);
     if (order.customerId === user.sub) return ok(order);
-    if (user.roles.includes(UserRole.SHOP_OWNER) && order.shop.ownerId === user.sub) return ok(order);
+    if (
+      user.roles.includes(UserRole.SHOP_OWNER) &&
+      order.shop.ownerId === user.sub
+    )
+      return ok(order);
     if (user.roles.includes(UserRole.RIDER)) {
-      const rider = await this.prisma.riderProfile.findUnique({ where: { userId: user.sub } });
+      const rider = await this.prisma.riderProfile.findUnique({
+        where: { userId: user.sub },
+      });
       if (rider && order.riderId === rider.id) return ok(order);
     }
     throw new ForbiddenException('You cannot access this order');
   }
 
-  async cancelCustomerOrder(user: AuthUser, orderId: string, dto: CancelOrderDto) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
+  async cancelCustomerOrder(
+    user: AuthUser,
+    orderId: string,
+    dto: CancelOrderDto,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
     if (!order) throw new NotFoundException('Order not found');
-    if (!user.roles.includes(UserRole.ADMIN) && !user.roles.includes(UserRole.SUPER_ADMIN) && order.customerId !== user.sub) {
+    if (
+      !user.roles.includes(UserRole.ADMIN) &&
+      !user.roles.includes(UserRole.SUPER_ADMIN) &&
+      order.customerId !== user.sub
+    ) {
       throw new ForbiddenException('You can only cancel your own orders');
     }
-    const cancellableStatuses: OrderStatus[] = [OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.ACCEPTED];
+    const cancellableStatuses: OrderStatus[] = [
+      OrderStatus.PLACED,
+      OrderStatus.CONFIRMED,
+      OrderStatus.ACCEPTED,
+    ];
     if (!cancellableStatuses.includes(order.status)) {
       throw new BadRequestException('Order cannot be cancelled at this stage');
     }
@@ -198,7 +260,10 @@ export class OrdersService {
     return ok(
       await this.prisma.$transaction(async (tx) => {
         for (const item of order.items) {
-          await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
         }
         return tx.order.update({
           where: { id: orderId },
@@ -216,7 +281,8 @@ export class OrdersService {
 
   async shopAccept(user: AuthUser, orderId: string) {
     const order = await this.assertShopOrder(user, orderId);
-    if (order.status !== OrderStatus.PLACED) throw new BadRequestException('Only placed orders can be accepted');
+    if (order.status !== OrderStatus.PLACED)
+      throw new BadRequestException('Only placed orders can be accepted');
     return ok(
       await this.prisma.order.update({
         where: { id: orderId },
@@ -229,14 +295,20 @@ export class OrdersService {
 
   async shopReject(user: AuthUser, orderId: string, reason: string) {
     const order = await this.assertShopOrder(user, orderId);
-    const rejectableStatuses: OrderStatus[] = [OrderStatus.PLACED, OrderStatus.ACCEPTED];
+    const rejectableStatuses: OrderStatus[] = [
+      OrderStatus.PLACED,
+      OrderStatus.ACCEPTED,
+    ];
     if (!rejectableStatuses.includes(order.status)) {
       throw new BadRequestException('Order cannot be rejected at this stage');
     }
     return ok(
       await this.prisma.$transaction(async (tx) => {
         for (const item of order.items) {
-          await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
         }
         return tx.order.update({
           where: { id: orderId },
@@ -254,20 +326,30 @@ export class OrdersService {
 
   async shopReady(user: AuthUser, orderId: string) {
     const order = await this.assertShopOrder(user, orderId);
-    const readyStatuses: OrderStatus[] = [OrderStatus.ACCEPTED, OrderStatus.PACKING, OrderStatus.PACKED];
+    const readyStatuses: OrderStatus[] = [
+      OrderStatus.ACCEPTED,
+      OrderStatus.PACKING,
+      OrderStatus.PACKED,
+    ];
     if (!readyStatuses.includes(order.status)) {
-      throw new BadRequestException('Order must be accepted before it can be marked ready');
+      throw new BadRequestException(
+        'Order must be accepted before it can be marked ready',
+      );
     }
+    const readyOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.READY_FOR_PICKUP,
+        delivery: { update: { status: DeliveryStatus.SEARCHING_RIDER } },
+      },
+      include: this.orderInclude(),
+    });
+    const assignedOrder = await this.assignmentService.assignBestRider(orderId);
     return ok(
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: {
-          status: OrderStatus.READY_FOR_PICKUP,
-          delivery: { update: { status: DeliveryStatus.SEARCHING_RIDER } },
-        },
-        include: this.orderInclude(),
-      }),
-      'Order ready for pickup',
+      assignedOrder ?? readyOrder,
+      assignedOrder
+        ? 'Order ready for pickup and rider assigned'
+        : 'Order ready for pickup; rider assignment pending',
     );
   }
 
@@ -288,25 +370,45 @@ export class OrdersService {
 
   async riderAccept(userId: string, orderId: string) {
     const rider = await this.findApprovedRider(userId);
-    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { shop: true } });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { shop: true },
+    });
     if (!order) throw new NotFoundException('Order not found');
     if (order.riderId) throw new BadRequestException('Order already assigned');
-    if (order.status !== OrderStatus.READY_FOR_PICKUP) throw new BadRequestException('Order is not available');
-    if (order.shop.cityId !== rider.cityId || (rider.zoneId && order.shop.zoneId !== rider.zoneId)) {
+    if (order.status !== OrderStatus.READY_FOR_PICKUP)
+      throw new BadRequestException('Order is not available');
+    if (
+      order.shop.cityId !== rider.cityId ||
+      (rider.zoneId && order.shop.zoneId !== rider.zoneId)
+    ) {
       throw new ForbiddenException('Order is outside your delivery zone');
     }
     return ok(
       await this.prisma.$transaction(async (tx) => {
         await tx.riderProfile.update({
           where: { id: rider.id },
-          data: { availabilityStatus: RiderAvailabilityStatus.ON_DELIVERY },
+          data: { availabilityStatus: RiderAvailabilityStatus.BUSY },
+        });
+        await tx.riderAssignmentAttempt.create({
+          data: {
+            orderId,
+            riderId: rider.id,
+            status: RiderAssignmentAttemptStatus.ACCEPTED,
+          },
         });
         return tx.order.update({
           where: { id: orderId },
           data: {
             riderId: rider.id,
             status: OrderStatus.ASSIGNED,
-            delivery: { update: { riderId: rider.id, status: DeliveryStatus.ASSIGNED, assignedAt: new Date() } },
+            delivery: {
+              update: {
+                riderId: rider.id,
+                status: DeliveryStatus.ASSIGNED,
+                assignedAt: new Date(),
+              },
+            },
           },
           include: this.orderInclude(),
         });
@@ -315,15 +417,83 @@ export class OrdersService {
     );
   }
 
+  async riderReject(
+    userId: string,
+    orderId: string,
+    reason = 'Rejected by rider',
+  ) {
+    const { rider, order } = await this.assertAssignedRiderOrder(
+      userId,
+      orderId,
+    );
+    if (order.status !== OrderStatus.ASSIGNED) {
+      throw new BadRequestException(
+        'Only assigned orders can be rejected by rider',
+      );
+    }
+
+    await this.assignmentService.markLatestAttemptRejected(
+      orderId,
+      rider.id,
+      reason,
+    );
+    const hasOtherActiveOrders =
+      await this.assignmentService.hasOtherActiveOrders(rider.id, orderId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.riderProfile.update({
+        where: { id: rider.id },
+        data: {
+          availabilityStatus: hasOtherActiveOrders
+            ? RiderAvailabilityStatus.BUSY
+            : RiderAvailabilityStatus.ONLINE,
+        },
+      });
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          riderId: null,
+          status: OrderStatus.READY_FOR_PICKUP,
+          delivery: {
+            update: {
+              riderId: null,
+              status: DeliveryStatus.SEARCHING_RIDER,
+            },
+          },
+        },
+      });
+    });
+    const reassigned =
+      await this.assignmentService.reassignAfterRejection(orderId);
+    const latest = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: this.orderInclude(),
+    });
+    return ok(
+      reassigned ?? latest,
+      reassigned
+        ? 'Order reassigned to next rider'
+        : 'Rider rejected; reassignment pending',
+    );
+  }
+
   async riderPickup(userId: string, orderId: string) {
-    const { rider, order } = await this.assertAssignedRiderOrder(userId, orderId);
-    if (order.status !== OrderStatus.ASSIGNED) throw new BadRequestException('Order is not assigned for pickup');
+    const { rider, order } = await this.assertAssignedRiderOrder(
+      userId,
+      orderId,
+    );
+    if (order.status !== OrderStatus.ASSIGNED)
+      throw new BadRequestException('Order is not assigned for pickup');
     return ok(
       await this.prisma.order.update({
         where: { id: orderId },
         data: {
           status: OrderStatus.OUT_FOR_DELIVERY,
-          delivery: { update: { status: DeliveryStatus.IN_TRANSIT, pickedUpAt: new Date() } },
+          delivery: {
+            update: {
+              status: DeliveryStatus.IN_TRANSIT,
+              pickedUpAt: new Date(),
+            },
+          },
           riderId: rider.id,
         },
         include: this.orderInclude(),
@@ -333,21 +503,36 @@ export class OrdersService {
   }
 
   async riderDeliver(userId: string, orderId: string) {
-    const { rider, order } = await this.assertAssignedRiderOrder(userId, orderId);
-    if (order.status !== OrderStatus.OUT_FOR_DELIVERY) throw new BadRequestException('Order is not out for delivery');
+    const { rider, order } = await this.assertAssignedRiderOrder(
+      userId,
+      orderId,
+    );
+    if (order.status !== OrderStatus.OUT_FOR_DELIVERY)
+      throw new BadRequestException('Order is not out for delivery');
     return ok(
       await this.prisma.$transaction(async (tx) => {
         await tx.riderProfile.update({
           where: { id: rider.id },
-          data: { availabilityStatus: RiderAvailabilityStatus.AVAILABLE, lastAvailableAt: new Date() },
+          data: {
+            availabilityStatus: RiderAvailabilityStatus.ONLINE,
+            lastAvailableAt: new Date(),
+          },
         });
         return tx.order.update({
           where: { id: orderId },
           data: {
             status: OrderStatus.DELIVERED,
             deliveredAt: new Date(),
-            paymentStatus: order.paymentMethod === PaymentMethod.COD ? PaymentStatus.COD_COLLECTED : order.paymentStatus,
-            delivery: { update: { status: DeliveryStatus.DELIVERED, deliveredAt: new Date() } },
+            paymentStatus:
+              order.paymentMethod === PaymentMethod.COD
+                ? PaymentStatus.COD_COLLECTED
+                : order.paymentStatus,
+            delivery: {
+              update: {
+                status: DeliveryStatus.DELIVERED,
+                deliveredAt: new Date(),
+              },
+            },
             payment:
               order.paymentMethod === PaymentMethod.COD
                 ? { update: { status: PaymentStatus.COD_COLLECTED } }
@@ -366,20 +551,29 @@ export class OrdersService {
       include: { items: true, shop: true },
     });
     if (!order) throw new NotFoundException('Order not found');
-    if (!user.roles.includes(UserRole.ADMIN) && !user.roles.includes(UserRole.SUPER_ADMIN) && order.shop.ownerId !== user.sub) {
+    if (
+      !user.roles.includes(UserRole.ADMIN) &&
+      !user.roles.includes(UserRole.SUPER_ADMIN) &&
+      order.shop.ownerId !== user.sub
+    ) {
       throw new ForbiddenException('You can only manage your own shop orders');
     }
     return order;
   }
 
   private async findOwnerShop(ownerId: string) {
-    const shop = await this.prisma.shop.findFirst({ where: { ownerId }, select: { id: true } });
+    const shop = await this.prisma.shop.findFirst({
+      where: { ownerId },
+      select: { id: true },
+    });
     if (!shop) throw new NotFoundException('Shop not found for this owner');
     return shop;
   }
 
   private async findApprovedRider(userId: string) {
-    const rider = await this.prisma.riderProfile.findUnique({ where: { userId } });
+    const rider = await this.prisma.riderProfile.findUnique({
+      where: { userId },
+    });
     if (!rider || rider.status !== RiderStatus.APPROVED) {
       throw new ForbiddenException('Approved rider profile required');
     }
@@ -388,9 +582,12 @@ export class OrdersService {
 
   private async assertAssignedRiderOrder(userId: string, orderId: string) {
     const rider = await this.findApprovedRider(userId);
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
     if (!order) throw new NotFoundException('Order not found');
-    if (order.riderId !== rider.id) throw new ForbiddenException('You can only update assigned orders');
+    if (order.riderId !== rider.id)
+      throw new ForbiddenException('You can only update assigned orders');
     return { rider, order };
   }
 

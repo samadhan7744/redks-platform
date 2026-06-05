@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { RiderStatus } from '@prisma/client';
+import { RiderAvailabilityStatus, RiderStatus } from '@prisma/client';
 import { ok } from '../../common/utils/api-response.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateRiderAvailabilityDto } from './dto/update-rider-availability.dto';
@@ -9,37 +9,61 @@ export class DeliveryService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findForRiderUser(userId: string) {
-    const rider = await this.prisma.riderProfile.findUnique({ where: { userId } });
-    return ok(await this.prisma.delivery.findMany({
-      where: { riderId: rider?.id ?? 'none' },
-      include: { order: true },
-      orderBy: { createdAt: 'desc' },
-    }));
+    const rider = await this.prisma.riderProfile.findUnique({
+      where: { userId },
+    });
+    return ok(
+      await this.prisma.delivery.findMany({
+        where: { riderId: rider?.id ?? 'none' },
+        include: { order: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async findAll() {
-    return ok(await this.prisma.delivery.findMany({
-      include: { order: true, rider: { include: { user: true } } },
-      orderBy: { createdAt: 'desc' },
-    }));
+    return ok(
+      await this.prisma.delivery.findMany({
+        include: { order: true, rider: { include: { user: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async updateAvailability(userId: string, dto: UpdateRiderAvailabilityDto) {
-    const rider = await this.prisma.riderProfile.findUnique({ where: { userId } });
+    const rider = await this.prisma.riderProfile.findUnique({
+      where: { userId },
+    });
     if (!rider || rider.status !== RiderStatus.APPROVED) {
       throw new ForbiddenException('Approved rider profile required');
     }
+    const availabilityStatus = this.normalizeAvailability(
+      dto.availabilityStatus,
+    );
     return ok(
       await this.prisma.riderProfile.update({
         where: { id: rider.id },
         data: {
-          availabilityStatus: dto.availabilityStatus,
+          availabilityStatus,
           currentLatitude: dto.currentLatitude,
           currentLongitude: dto.currentLongitude,
-          lastAvailableAt: dto.availabilityStatus === 'AVAILABLE' ? new Date() : undefined,
+          lastAvailableAt:
+            availabilityStatus === RiderAvailabilityStatus.ONLINE
+              ? new Date()
+              : undefined,
         },
       }),
       'Rider availability updated',
     );
+  }
+
+  private normalizeAvailability(status: RiderAvailabilityStatus) {
+    if (status === RiderAvailabilityStatus.AVAILABLE) {
+      return RiderAvailabilityStatus.ONLINE;
+    }
+    if (status === RiderAvailabilityStatus.ON_DELIVERY) {
+      return RiderAvailabilityStatus.BUSY;
+    }
+    return status;
   }
 }

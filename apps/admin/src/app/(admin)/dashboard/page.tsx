@@ -1,6 +1,6 @@
 'use client';
 
-import { Activity, Bike, Building2, IndianRupee, ShoppingCart, Store, Users } from 'lucide-react';
+import { Bike, Building2, IndianRupee, ShoppingCart, Store, UserCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ErrorState, LoadingState } from '@/components/state-view';
 import { PageHeader } from '@/components/page-header';
@@ -16,6 +16,7 @@ type Summary = {
   gmvToday: number;
   ridersOnline: number;
   pendingItemRequests: number;
+  pendingRiderApprovals?: number;
 };
 
 type SummaryCard = {
@@ -26,13 +27,12 @@ type SummaryCard = {
 };
 
 const cards: SummaryCard[] = [
-  { key: 'totalUsers', label: 'Total users', icon: Users },
-  { key: 'shopsPending', label: 'Shops pending', icon: Building2 },
-  { key: 'activeShops', label: 'Active shops', icon: Store },
-  { key: 'ordersToday', label: 'Orders today', icon: ShoppingCart },
-  { key: 'gmvToday', label: 'GMV today', icon: IndianRupee, money: true },
-  { key: 'ridersOnline', label: 'Riders online', icon: Bike },
-  { key: 'pendingItemRequests', label: 'Pending item requests', icon: Activity },
+  { key: 'ordersToday', label: 'Orders Today', icon: ShoppingCart },
+  { key: 'gmvToday', label: 'Revenue Today', icon: IndianRupee, money: true },
+  { key: 'activeShops', label: 'Active Shops', icon: Store },
+  { key: 'ridersOnline', label: 'Active Riders', icon: Bike },
+  { key: 'shopsPending', label: 'Pending Shop Approvals', icon: Building2 },
+  { key: 'pendingRiderApprovals', label: 'Pending Rider Approvals', icon: UserCheck },
 ];
 
 export default function DashboardPage() {
@@ -44,18 +44,20 @@ export default function DashboardPage() {
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} /> : null}
       {data ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => {
             const Icon = card.icon;
-            const value = data[card.key];
+            const value = data[card.key] ?? 0;
             return (
-              <Card key={card.key}>
+              <Card key={card.key} className="overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">{card.label}</CardTitle>
-                  <Icon className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm font-bold text-muted-foreground">{card.label}</CardTitle>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-semibold">{card.money ? formatCurrency(value) : value}</div>
+                  <div className="text-3xl font-black text-slate-950">{card.money ? formatCurrency(value) : value}</div>
                 </CardContent>
               </Card>
             );

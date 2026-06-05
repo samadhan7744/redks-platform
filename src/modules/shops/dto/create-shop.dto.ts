@@ -81,6 +81,11 @@ export class CreateShopDto {
   @IsString()
   shopPhotoUrl?: string;
 
+  @ApiPropertyOptional({ example: 'https://example.com/owner.jpg' })
+  @IsOptional()
+  @IsString()
+  ownerPhotoUrl?: string;
+
   @ApiProperty({ example: 'sharmakirana@upi' })
   @IsString()
   @Matches(upiPattern, { message: 'upiId must be a valid UPI ID' })

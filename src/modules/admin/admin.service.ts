@@ -5,7 +5,9 @@ import {
   RiderAvailabilityStatus,
   RiderStatus,
   ShopDocumentStatus,
+  ShopRiderStatus,
   ShopStatus,
+  VerificationDocumentStatus,
   VerificationStatus,
 } from '@prisma/client';
 import {
@@ -29,7 +31,15 @@ export class AdminService {
   async pendingShops() {
     return ok(
       await this.prisma.shop.findMany({
-        where: { status: ShopStatus.PENDING_APPROVAL },
+        where: {
+          status: {
+            in: [
+              ShopStatus.SUBMITTED,
+              ShopStatus.PENDING_APPROVAL,
+              ShopStatus.UNDER_REVIEW,
+            ],
+          },
+        },
         include: this.shopInclude(),
         orderBy: { createdAt: 'asc' },
       }),
@@ -94,7 +104,12 @@ export class AdminService {
     );
   }
 
-  async rejectShop(adminId: string, shopId: string, rejectionReason: string) {
+  async rejectShop(
+    adminId: string,
+    shopId: string,
+    rejectionReason: string,
+    reviewNotes?: string,
+  ) {
     return ok(
       await this.prisma.shop.update({
         where: { id: shopId },
@@ -103,10 +118,34 @@ export class AdminService {
           verificationStatus: VerificationStatus.REJECTED,
           approvedById: adminId,
           rejectionReason,
+          reviewNotes,
         },
         include: this.shopInclude(),
       }),
       'Shop rejected',
+    );
+  }
+
+  async requestShopChanges(
+    adminId: string,
+    shopId: string,
+    reason: string,
+    reviewNotes?: string,
+  ) {
+    return ok(
+      await this.prisma.shop.update({
+        where: { id: shopId },
+        data: {
+          status: ShopStatus.CHANGES_REQUESTED,
+          verificationStatus: VerificationStatus.REJECTED,
+          approvedById: adminId,
+          rejectionReason: reason,
+          reviewNotes,
+          changesRequestedAt: new Date(),
+        },
+        include: this.shopInclude(),
+      }),
+      'Shop changes requested',
     );
   }
 
@@ -144,7 +183,11 @@ export class AdminService {
     documentId: string,
     dto: UpdateShopDocumentStatusDto,
   ) {
-    if (dto.status === ShopDocumentStatus.REJECTED && !dto.rejectionReason) {
+    if (
+      (dto.status === ShopDocumentStatus.REJECTED ||
+        dto.status === ShopDocumentStatus.CHANGES_REQUESTED) &&
+      !dto.rejectionReason
+    ) {
       throw new BadRequestException('Rejection reason is required');
     }
     await this.prisma.shopDocument.findFirstOrThrow({
@@ -156,8 +199,14 @@ export class AdminService {
         data: {
           status: dto.status,
           rejectionReason:
-            dto.status === ShopDocumentStatus.REJECTED
+            dto.status === ShopDocumentStatus.REJECTED ||
+            dto.status === ShopDocumentStatus.CHANGES_REQUESTED
               ? dto.rejectionReason
+              : null,
+          reviewNotes: dto.reviewNotes,
+          requestedChanges:
+            dto.status === ShopDocumentStatus.CHANGES_REQUESTED
+              ? (dto.requestedChanges ?? dto.rejectionReason)
               : null,
         },
       }),
@@ -168,8 +217,16 @@ export class AdminService {
   async pendingRiders() {
     return ok(
       await this.prisma.riderProfile.findMany({
-        where: { status: RiderStatus.PENDING_APPROVAL },
-        include: { user: true, city: true, zone: true },
+        where: {
+          status: {
+            in: [
+              RiderStatus.SUBMITTED,
+              RiderStatus.PENDING_APPROVAL,
+              RiderStatus.UNDER_REVIEW,
+            ],
+          },
+        },
+        include: this.riderInclude(),
         orderBy: { createdAt: 'asc' },
       }),
     );
@@ -205,7 +262,7 @@ export class AdminService {
         where,
         skip,
         take,
-        include: { user: true, city: true, zone: true },
+        include: this.riderInclude(),
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.riderProfile.count({ where }),
@@ -214,12 +271,25 @@ export class AdminService {
     return paginated(data, total, page, limit);
   }
 
+  async findRiderById(riderId: string) {
+    return ok(
+      await this.prisma.riderProfile.findUniqueOrThrow({
+        where: { id: riderId },
+        include: this.riderInclude(),
+      }),
+    );
+  }
+
   async updateRiderStatus(
     adminId: string,
     riderId: string,
     dto: UpdateRiderStatusDto,
   ) {
-    if (dto.status === RiderStatus.REJECTED && !dto.rejectionReason) {
+    if (
+      (dto.status === RiderStatus.REJECTED ||
+        dto.status === RiderStatus.CHANGES_REQUESTED) &&
+      !dto.rejectionReason
+    ) {
       throw new BadRequestException('Rejection reason is required');
     }
 
@@ -233,7 +303,13 @@ export class AdminService {
           approvedAt:
             dto.status === RiderStatus.APPROVED ? new Date() : undefined,
           rejectionReason: dto.rejectionReason,
+          reviewNotes: dto.reviewNotes,
+          changesRequestedAt:
+            dto.status === RiderStatus.CHANGES_REQUESTED
+              ? new Date()
+              : undefined,
         },
+        include: this.riderInclude(),
       }),
       'Rider status updated',
     );
@@ -251,6 +327,7 @@ export class AdminService {
       gmvToday,
       ridersOnline,
       pendingItemRequests,
+      pendingRiderApprovals,
     ] = await this.prisma.$transaction([
       this.prisma.user.count(),
       this.prisma.shop.count({
@@ -270,6 +347,17 @@ export class AdminService {
           status: { in: [ItemRequestStatus.OPEN, ItemRequestStatus.IN_REVIEW] },
         },
       }),
+      this.prisma.riderProfile.count({
+        where: {
+          status: {
+            in: [
+              RiderStatus.SUBMITTED,
+              RiderStatus.PENDING_APPROVAL,
+              RiderStatus.UNDER_REVIEW,
+            ],
+          },
+        },
+      }),
     ]);
 
     return ok({
@@ -280,6 +368,7 @@ export class AdminService {
       gmvToday: Number(gmvToday._sum.totalAmount ?? 0),
       ridersOnline,
       pendingItemRequests,
+      pendingRiderApprovals,
     });
   }
 
@@ -360,6 +449,51 @@ export class AdminService {
     return paginated(data, total, page, limit);
   }
 
+  async findShopRiders() {
+    return ok(
+      await this.prisma.shopRider.findMany({
+        include: { shop: true, verificationDocuments: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+  }
+
+  async updateShopRiderStatus(
+    adminId: string,
+    shopRiderId: string,
+    status: ShopRiderStatus,
+    reason?: string,
+    reviewNotes?: string,
+  ) {
+    if (
+      (status === ShopRiderStatus.REJECTED ||
+        status === ShopRiderStatus.CHANGES_REQUESTED) &&
+      !reason
+    ) {
+      throw new BadRequestException('Reason is required');
+    }
+    return ok(
+      await this.prisma.shopRider.update({
+        where: { id: shopRiderId },
+        data: {
+          status,
+          approvedById:
+            status === ShopRiderStatus.APPROVED ? adminId : undefined,
+          approvedAt:
+            status === ShopRiderStatus.APPROVED ? new Date() : undefined,
+          rejectionReason: reason,
+          reviewNotes,
+          changesRequestedAt:
+            status === ShopRiderStatus.CHANGES_REQUESTED
+              ? new Date()
+              : undefined,
+        },
+        include: { shop: true, verificationDocuments: true },
+      }),
+      'Shop rider status updated',
+    );
+  }
+
   private shopInclude() {
     return {
       owner: true,
@@ -368,6 +502,16 @@ export class AdminService {
       category: true,
       documents: true,
       categories: { include: { category: true } },
+    };
+  }
+
+  private riderInclude() {
+    return {
+      user: true,
+      city: true,
+      zone: true,
+      verificationDocuments: true,
+      shopRiders: { include: { shop: true, verificationDocuments: true } },
     };
   }
 }

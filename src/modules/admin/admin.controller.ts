@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { RiderStatus, ShopRiderStatus, UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -58,12 +58,31 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: RejectShopDto,
   ) {
-    return this.adminService.rejectShop(user.sub, id, dto.reason);
+    return this.adminService.rejectShop(
+      user.sub,
+      id,
+      dto.reason,
+      dto.reviewNotes,
+    );
   }
 
   @Patch('shops/:id/suspend')
   suspendShop(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.adminService.suspendShop(user.sub, id);
+  }
+
+  @Patch('shops/:id/request-changes')
+  requestShopChanges(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RejectShopDto,
+  ) {
+    return this.adminService.requestShopChanges(
+      user.sub,
+      id,
+      dto.reason,
+      dto.reviewNotes,
+    );
   }
 
   @Patch('shops/:id/commission')
@@ -93,6 +112,49 @@ export class AdminController {
     return this.adminService.findRiders(query);
   }
 
+  @Get('riders/:id')
+  rider(@Param('id') id: string) {
+    return this.adminService.findRiderById(id);
+  }
+
+  @Patch('riders/:id/approve')
+  approveRider(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.adminService.updateRiderStatus(user.sub, id, {
+      status: RiderStatus.APPROVED,
+    });
+  }
+
+  @Patch('riders/:id/reject')
+  rejectRider(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateRiderStatusDto,
+  ) {
+    return this.adminService.updateRiderStatus(user.sub, id, {
+      ...dto,
+      status: RiderStatus.REJECTED,
+    });
+  }
+
+  @Patch('riders/:id/suspend')
+  suspendRider(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.adminService.updateRiderStatus(user.sub, id, {
+      status: RiderStatus.SUSPENDED,
+    });
+  }
+
+  @Patch('riders/:id/request-changes')
+  requestRiderChanges(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateRiderStatusDto,
+  ) {
+    return this.adminService.updateRiderStatus(user.sub, id, {
+      ...dto,
+      status: RiderStatus.CHANGES_REQUESTED,
+    });
+  }
+
   @Patch('riders/:id/status')
   updateRiderStatus(
     @CurrentUser() user: AuthUser,
@@ -105,6 +167,59 @@ export class AdminController {
   @Get('dashboard/summary')
   dashboardSummary() {
     return this.adminService.dashboardSummary();
+  }
+
+  @Get('shop-riders')
+  shopRiders() {
+    return this.adminService.findShopRiders();
+  }
+
+  @Patch('shop-riders/:id/approve')
+  approveShopRider(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.adminService.updateShopRiderStatus(
+      user.sub,
+      id,
+      ShopRiderStatus.APPROVED,
+    );
+  }
+
+  @Patch('shop-riders/:id/reject')
+  rejectShopRider(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RejectShopDto,
+  ) {
+    return this.adminService.updateShopRiderStatus(
+      user.sub,
+      id,
+      ShopRiderStatus.REJECTED,
+      dto.reason,
+      dto.reviewNotes,
+    );
+  }
+
+  @Patch('shop-riders/:id/suspend')
+  suspendShopRider(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.adminService.updateShopRiderStatus(
+      user.sub,
+      id,
+      ShopRiderStatus.SUSPENDED,
+    );
+  }
+
+  @Patch('shop-riders/:id/request-changes')
+  requestShopRiderChanges(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RejectShopDto,
+  ) {
+    return this.adminService.updateShopRiderStatus(
+      user.sub,
+      id,
+      ShopRiderStatus.CHANGES_REQUESTED,
+      dto.reason,
+      dto.reviewNotes,
+    );
   }
 
   @Get('item-requests')

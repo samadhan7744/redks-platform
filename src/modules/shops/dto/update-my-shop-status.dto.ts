@@ -3,7 +3,9 @@ import { ShopStatus } from '@prisma/client';
 import { IsEnum } from 'class-validator';
 
 export class UpdateMyShopStatusDto {
-  @ApiProperty({ enum: [ShopStatus.DRAFT, ShopStatus.PENDING_APPROVAL] })
+  @ApiProperty({
+    enum: [ShopStatus.DRAFT, ShopStatus.SUBMITTED, ShopStatus.PENDING_APPROVAL],
+  })
   @IsEnum(ShopStatus)
   status: ShopStatus;
 }

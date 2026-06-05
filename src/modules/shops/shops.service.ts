@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   DeliveryMode,
+  ShopRiderStatus,
   ShopStatus,
   UserRole,
   VerificationStatus,
@@ -18,6 +19,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { CreateShopDocumentDto } from './dto/create-shop-document.dto';
+import { CreateShopRiderDto } from './dto/create-shop-rider.dto';
 import { ShopQueryDto } from './dto/shop-query.dto';
 import { UpdateMyShopStatusDto } from './dto/update-my-shop-status.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
@@ -142,13 +144,14 @@ export class ShopsService {
         addressLine1: dto.addressLine1,
         pincode: dto.pincode,
         slug,
-        status: ShopStatus.PENDING_APPROVAL,
+        status: ShopStatus.SUBMITTED,
         verificationStatus: VerificationStatus.PENDING,
+        submittedAt: new Date(),
       },
       include: this.shopInclude(),
     });
     await this.syncShopCategory(shop.id, dto.categoryId);
-    return ok(shop, 'Shop registered for approval');
+    return ok(shop, 'Shop submitted for approval');
   }
 
   async findMyShop(ownerId: string) {
@@ -184,11 +187,12 @@ export class ShopsService {
   async updateMyStatus(ownerId: string, dto: UpdateMyShopStatusDto) {
     const ownerEditableStatuses: ShopStatus[] = [
       ShopStatus.DRAFT,
+      ShopStatus.SUBMITTED,
       ShopStatus.PENDING_APPROVAL,
     ];
     if (!ownerEditableStatuses.includes(dto.status)) {
       throw new BadRequestException(
-        'Shop owner can only set DRAFT or PENDING_APPROVAL',
+        'Shop owner can only set DRAFT, SUBMITTED, or PENDING_APPROVAL',
       );
     }
     const shop = await this.findOwnedShop(ownerId);
@@ -204,7 +208,11 @@ export class ShopsService {
     shopId: string,
     dto: UpdateShopStatusDto,
   ) {
-    if (dto.status === ShopStatus.REJECTED && !dto.rejectionReason) {
+    if (
+      (dto.status === ShopStatus.REJECTED ||
+        dto.status === ShopStatus.CHANGES_REQUESTED) &&
+      !dto.rejectionReason
+    ) {
       throw new BadRequestException('Rejection reason is required');
     }
 
@@ -216,6 +224,14 @@ export class ShopsService {
         approvedAt: dto.status === ShopStatus.APPROVED ? new Date() : undefined,
         verificationStatus: this.verificationStatusFor(dto.status),
         rejectionReason: dto.rejectionReason,
+        reviewNotes: dto.reviewNotes,
+        changesRequestedAt:
+          dto.status === ShopStatus.CHANGES_REQUESTED ? new Date() : undefined,
+        submittedAt:
+          dto.status === ShopStatus.SUBMITTED ||
+          dto.status === ShopStatus.PENDING_APPROVAL
+            ? new Date()
+            : undefined,
       },
       include: this.shopInclude(),
     });
@@ -235,6 +251,19 @@ export class ShopsService {
 
   suspend(adminId: string, shopId: string) {
     return this.updateStatus(adminId, shopId, { status: ShopStatus.SUSPENDED });
+  }
+
+  requestChanges(
+    adminId: string,
+    shopId: string,
+    reason: string,
+    reviewNotes?: string,
+  ) {
+    return this.updateStatus(adminId, shopId, {
+      status: ShopStatus.CHANGES_REQUESTED,
+      rejectionReason: reason,
+      reviewNotes,
+    });
   }
 
   async assertOwner(shopId: string, ownerId: string) {
@@ -281,6 +310,42 @@ export class ShopsService {
     );
   }
 
+  async createMyShopRider(ownerId: string, dto: CreateShopRiderDto) {
+    const shop = await this.findOwnedShop(ownerId);
+    return ok(
+      await this.prisma.shopRider.create({
+        data: {
+          shopId: shop.id,
+          fullName: dto.fullName,
+          phone: dto.phone,
+          email: dto.email,
+          vehicleType: dto.vehicleType,
+          vehicleNumber: dto.vehicleNumber,
+          upiId: dto.upiId,
+          bankAccount: dto.bankAccount,
+          emergencyName: dto.emergencyName,
+          emergencyPhone: dto.emergencyPhone,
+          profilePhotoUrl: dto.profilePhotoUrl,
+          status: ShopRiderStatus.SUBMITTED,
+          submittedAt: new Date(),
+        },
+        include: { verificationDocuments: true },
+      }),
+      'Shop rider submitted for approval',
+    );
+  }
+
+  async findMyShopRiders(ownerId: string) {
+    const shop = await this.findOwnedShop(ownerId);
+    return ok(
+      await this.prisma.shopRider.findMany({
+        where: { shopId: shop.id },
+        include: { verificationDocuments: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+  }
+
   private toShopData(dto: Partial<CreateShopDto>) {
     const shopName = dto.shopName ?? dto.name;
     const ownerPhone = dto.ownerPhone ?? dto.phone;
@@ -302,6 +367,7 @@ export class ShopsService {
       latitude: dto.latitude,
       longitude: dto.longitude,
       shopPhotoUrl: dto.shopPhotoUrl,
+      ownerPhotoUrl: dto.ownerPhotoUrl,
       upiId: dto.upiId,
       gstNumber: dto.gstNumber,
       fssaiNumber: dto.fssaiNumber,
@@ -331,7 +397,11 @@ export class ShopsService {
 
   private verificationStatusFor(status: ShopStatus) {
     if (status === ShopStatus.APPROVED) return VerificationStatus.APPROVED;
-    if (status === ShopStatus.REJECTED) return VerificationStatus.REJECTED;
+    if (
+      status === ShopStatus.REJECTED ||
+      status === ShopStatus.CHANGES_REQUESTED
+    )
+      return VerificationStatus.REJECTED;
     if (status === ShopStatus.SUSPENDED) return VerificationStatus.SUSPENDED;
     return VerificationStatus.PENDING;
   }
@@ -342,6 +412,7 @@ export class ShopsService {
       zone: true,
       category: true,
       documents: true,
+      shopRiders: true,
       categories: { include: { category: true } },
     };
   }

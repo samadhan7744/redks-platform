@@ -14,6 +14,24 @@ export type Rider = {
   availabilityStatus: string;
   vehicleType?: string | null;
   vehicleNumber?: string | null;
+  fullName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  aadhaarUrl?: string | null;
+  panUrl?: string | null;
+  drivingLicenseUrl?: string | null;
+  vehicleRcUrl?: string | null;
+  insuranceUrl?: string | null;
+  selfieUrl?: string | null;
+  profilePhotoUrl?: string | null;
+  upiId?: string | null;
+  bankAccount?: string | null;
+  emergencyName?: string | null;
+  emergencyPhone?: string | null;
+  rejectionReason?: string | null;
+  reviewNotes?: string | null;
+  verificationDocuments?: VerificationDocument[];
+  shopRiders?: ShopRider[];
   user?: User;
   city?: City;
   zone?: Zone | null;
@@ -67,6 +85,7 @@ export type Shop = {
   fssaiNumber?: string | null;
   panNumber?: string | null;
   shopPhotoUrl?: string | null;
+  ownerPhotoUrl?: string | null;
   deliveryRadiusKm?: string | number | null;
   minOrderValue?: string | number;
   openingTime?: string | null;
@@ -74,13 +93,41 @@ export type Shop = {
   weeklyOffDay?: string | null;
   commissionPercent?: string | number;
   rejectionReason?: string | null;
+  reviewNotes?: string | null;
   city?: City;
   zone?: Zone;
   category?: Category | null;
   categories?: Array<{ category?: Category }>;
   documents?: ShopDocument[];
+  verificationDocuments?: VerificationDocument[];
+  shopRiders?: ShopRider[];
   owner?: User;
   createdAt?: string;
+};
+
+export type VerificationDocument = {
+  id: string;
+  type: string;
+  fileUrl: string;
+  status: string;
+  rejectionReason?: string | null;
+  reviewNotes?: string | null;
+  requestedChanges?: string | null;
+  createdAt?: string;
+};
+
+export type ShopRider = {
+  id: string;
+  fullName: string;
+  phone: string;
+  email?: string | null;
+  status: string;
+  vehicleType?: string | null;
+  vehicleNumber?: string | null;
+  profilePhotoUrl?: string | null;
+  rejectionReason?: string | null;
+  reviewNotes?: string | null;
+  verificationDocuments?: VerificationDocument[];
 };
 
 export type ShopDocument = {

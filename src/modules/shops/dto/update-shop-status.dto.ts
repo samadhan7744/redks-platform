@@ -4,7 +4,14 @@ import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class UpdateShopStatusDto {
   @ApiProperty({
-    enum: [ShopStatus.APPROVED, ShopStatus.REJECTED, ShopStatus.SUSPENDED],
+    enum: [
+      ShopStatus.SUBMITTED,
+      ShopStatus.UNDER_REVIEW,
+      ShopStatus.APPROVED,
+      ShopStatus.REJECTED,
+      ShopStatus.SUSPENDED,
+      ShopStatus.CHANGES_REQUESTED,
+    ],
   })
   @IsEnum(ShopStatus)
   status: ShopStatus;
@@ -13,4 +20,9 @@ export class UpdateShopStatusDto {
   @IsOptional()
   @IsString()
   rejectionReason?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  reviewNotes?: string;
 }

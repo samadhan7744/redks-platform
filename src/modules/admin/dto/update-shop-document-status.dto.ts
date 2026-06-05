@@ -15,4 +15,20 @@ export class UpdateShopDocumentStatusDto {
   @IsString()
   @Length(3, 200)
   rejectionReason?: string;
+
+  @ApiPropertyOptional({
+    example: 'Please upload a clearer front-facing image.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 500)
+  reviewNotes?: string;
+
+  @ApiPropertyOptional({
+    example: 'Reupload document with all corners visible.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 500)
+  requestedChanges?: string;
 }

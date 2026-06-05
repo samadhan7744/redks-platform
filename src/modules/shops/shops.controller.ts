@@ -17,6 +17,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { CreateShopDocumentDto } from './dto/create-shop-document.dto';
+import { CreateShopRiderDto } from './dto/create-shop-rider.dto';
 import { ShopQueryDto } from './dto/shop-query.dto';
 import { UpdateMyShopStatusDto } from './dto/update-my-shop-status.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
@@ -79,6 +80,25 @@ export class ShopsController {
   @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   myShopDocuments(@CurrentUser() user: AuthUser) {
     return this.shopsService.findMyShopDocuments(user.sub);
+  }
+
+  @Post('my-shop/riders')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  createMyShopRider(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateShopRiderDto,
+  ) {
+    return this.shopsService.createMyShopRider(user.sub, dto);
+  }
+
+  @Get('my-shop/riders')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SHOP_OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  myShopRiders(@CurrentUser() user: AuthUser) {
+    return this.shopsService.findMyShopRiders(user.sub);
   }
 
   @Patch('my-shop/status')

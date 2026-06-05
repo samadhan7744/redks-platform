@@ -72,6 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -83,66 +84,120 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'RedKS',
-                      style: TextStyle(
-                        fontSize: 42,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFB91C1C),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111827),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Har Dukaan, Ghar Tak.',
-                      style: TextStyle(fontSize: 16, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _phone,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'Mobile number',
-                        prefixText: '+91 ',
-                      ),
-                      validator: (value) => (value ?? '').trim().length == 10
-                          ? null
-                          : 'Enter a valid 10 digit phone number.',
-                      enabled: !_otpRequested,
-                    ),
-                    if (_otpRequested) ...[
-                      const SizedBox(height: 14),
-                      TextField(
-                        controller: _otp,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(6),
+                      child: Row(
+                        children: [
+                          Image.asset(
+                            'assets/images/redks_logo.png',
+                            width: 64,
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'RedKS Partner',
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Shop & Delivery Network',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
-                        decoration: const InputDecoration(labelText: 'OTP'),
                       ),
-                      if (_devOtp != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text('Development OTP: $_devOtp'),
-                        ),
-                    ],
-                    if (_error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.red),
+                    ),
+                    const SizedBox(height: 18),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Secure OTP login',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Manage orders, products, shop approvals and rider work from your RedKS partner account.',
+                              style: TextStyle(color: Colors.black54),
+                            ),
+                            const SizedBox(height: 18),
+                            TextFormField(
+                              controller: _phone,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: 'Mobile number',
+                                prefixText: '+91 ',
+                              ),
+                              validator: (value) =>
+                                  (value ?? '').trim().length == 10
+                                  ? null
+                                  : 'Enter a valid 10 digit phone number.',
+                              enabled: !_otpRequested,
+                            ),
+                            if (_otpRequested) ...[
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: _otp,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(6),
+                                ],
+                                decoration: const InputDecoration(
+                                  labelText: 'OTP',
+                                ),
+                              ),
+                              if (_devOtp != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text('Development OTP: $_devOtp'),
+                                ),
+                            ],
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Text(
+                                  _error!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            const SizedBox(height: 24),
+                            PrimaryButton(
+                              label: _otpRequested
+                                  ? 'Verify OTP'
+                                  : 'Request OTP',
+                              loading:
+                                  _loading || ref.watch(authProvider).isLoading,
+                              onPressed: _otpRequested
+                                  ? _verifyOtp
+                                  : _requestOtp,
+                            ),
+                          ],
                         ),
                       ),
-                    const SizedBox(height: 24),
-                    PrimaryButton(
-                      label: _otpRequested ? 'Verify OTP' : 'Request OTP',
-                      loading: _loading || ref.watch(authProvider).isLoading,
-                      onPressed: _otpRequested ? _verifyOtp : _requestOtp,
                     ),
                     if (_otpRequested)
                       TextButton(

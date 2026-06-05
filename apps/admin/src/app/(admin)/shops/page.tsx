@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Eye, Search, ShieldOff, X } from 'lucide-react';
+import { Check, Eye, FileWarning, Search, ShieldOff, X } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Modal } from '@/components/modal';
 import { PaginationControls } from '@/components/pagination-controls';
@@ -58,10 +58,13 @@ export default function ShopsPage() {
     setCommission(String(shop.commissionPercent ?? 10));
   }
 
-  async function action(id: string, type: 'approve' | 'reject' | 'suspend') {
+  async function action(
+    id: string,
+    type: 'approve' | 'reject' | 'suspend' | 'request-changes',
+  ) {
     const body =
-      type === 'reject'
-        ? { reason: reason || 'Rejected from admin panel' }
+      type === 'reject' || type === 'request-changes'
+        ? { reason: reason || 'Changes required from admin panel', reviewNotes: reason }
         : undefined;
     await api.patch(`/admin/shops/${id}/${type}`, body);
     await reload();
@@ -118,8 +121,10 @@ export default function ShopsPage() {
           }}
         >
           <option value="">All statuses</option>
+          <option value="SUBMITTED">Submitted</option>
           <option value="PENDING_APPROVAL">Pending approval</option>
           <option value="UNDER_REVIEW">Under review</option>
+          <option value="CHANGES_REQUESTED">Changes requested</option>
           <option value="APPROVED">Approved</option>
           <option value="REJECTED">Rejected</option>
           <option value="SUSPENDED">Suspended</option>
@@ -230,10 +235,15 @@ export default function ShopsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      setReason('Rejected from admin panel');
-                      void action(row.id, 'reject');
-                    }}
+                    onClick={() => action(row.id, 'request-changes')}
+                  >
+                    <FileWarning className="h-3 w-3" />
+                    Changes
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => action(row.id, 'reject')}
                   >
                     <X className="h-3 w-3" />
                     Reject
@@ -302,6 +312,14 @@ export default function ShopsPage() {
             </section>
 
             <section>
+              <h3 className="mb-2 font-semibold">Photos</h3>
+              <div className="grid gap-3 md:grid-cols-2">
+                <PhotoPreview label="Shop photo" url={selected.shopPhotoUrl} />
+                <PhotoPreview label="Owner photo" url={selected.ownerPhotoUrl} />
+              </div>
+            </section>
+
+            <section>
               <h3 className="mb-2 font-semibold">Documents</h3>
               <div className="space-y-2">
                 {(selected.documents ?? []).length === 0 ? (
@@ -347,6 +365,24 @@ export default function ShopsPage() {
                     </div>
                   </div>
                 ))}
+                {(selected.verificationDocuments ?? []).map((doc) => (
+                  <div key={doc.id} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="font-medium">{doc.type}</div>
+                        <a
+                          className="text-xs text-red-700 underline"
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {doc.fileUrl}
+                        </a>
+                      </div>
+                      <StatusBadge value={doc.status} />
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -376,6 +412,13 @@ export default function ShopsPage() {
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={() => action(selected.id, 'request-changes')}
+                >
+                  <FileWarning className="h-4 w-4" />
+                  Request changes
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => action(selected.id, 'reject')}
                 >
                   <X className="h-4 w-4" />
@@ -394,6 +437,24 @@ export default function ShopsPage() {
         ) : null}
       </Modal>
     </>
+  );
+}
+
+function PhotoPreview({ label, url }: { label: string; url?: string | null }) {
+  return (
+    <div className="rounded-md border p-3">
+      <div className="text-xs uppercase text-muted-foreground">{label}</div>
+      {url ? (
+        <a href={url} target="_blank" rel="noreferrer" className="mt-2 block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt={label} className="h-32 w-full rounded-md object-cover" />
+        </a>
+      ) : (
+        <div className="mt-2 flex h-32 items-center justify-center rounded-md bg-slate-50 text-sm text-muted-foreground">
+          Not uploaded
+        </div>
+      )}
+    </div>
   );
 }
 

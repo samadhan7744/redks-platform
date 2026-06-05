@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_state_view.dart';
 import '../../../core/widgets/redks_app_bar.dart';
 import '../../../data/models/models.dart';
@@ -113,33 +114,82 @@ class BrowseHome extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LocationScreen()),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111827),
+                borderRadius: BorderRadius.circular(22),
               ),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        city == null
-                            ? 'Select your city and zone'
-                            : '${city.name}${zone == null ? '' : ' · ${zone.name}'}',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Daily needs from nearby shops',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Groceries, medicines, essentials and custom requests delivered locally.',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 14),
+                  InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LocationScreen()),
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              city == null
+                                  ? 'Select your city and zone'
+                                  : '${city.name}${zone == null ? '' : ' / ${zone.name}'}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right),
-                  ],
-                ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFFFECB3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.flash_on, color: AppTheme.yellow),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Request any item your nearby shops can source.',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 18),

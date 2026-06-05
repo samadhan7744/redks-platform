@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/async_state_view.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/redks_app_bar.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repositories/redks_repository.dart';
 import '../../addresses/screens/addresses_screen.dart';
@@ -38,6 +39,36 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111827),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.lock_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Review delivery and payment',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  '₹${cart.total.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    color: AppTheme.yellow,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
           const Text(
             'Delivery address',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
@@ -46,12 +77,34 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           addresses.when(
             data: (items) {
               if (items.isEmpty) {
-                return OutlinedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddressesScreen()),
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'No saved address',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Add a delivery address before placing this order.',
+                          style: TextStyle(color: AppTheme.muted),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AddressesScreen(),
+                            ),
+                          ),
+                          child: const Text('Add address'),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Text('Add address'),
                 );
               }
               addressId ??= items.first.id;
@@ -99,11 +152,38 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ],
           ),
           if (error != null)
-            Text(error!, style: const TextStyle(color: Colors.red)),
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                error!,
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
-          Text(
-            'Total: ₹${cart.total.toStringAsFixed(0)}',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Payable amount',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  Text(
+                    '₹${cart.total.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AssignmentModule } from '../assignment/assignment.module';
 import { AdminOrdersController } from './admin-orders.controller';
 import { OrderCalculationService } from './order-calculation.service';
 import { OrdersController } from './orders.controller';
@@ -7,7 +8,13 @@ import { RiderOrdersController } from './rider-orders.controller';
 import { ShopOrdersController } from './shop-orders.controller';
 
 @Module({
-  controllers: [OrdersController, ShopOrdersController, RiderOrdersController, AdminOrdersController],
+  imports: [AssignmentModule],
+  controllers: [
+    OrdersController,
+    ShopOrdersController,
+    RiderOrdersController,
+    AdminOrdersController,
+  ],
   providers: [OrdersService, OrderCalculationService],
   exports: [OrdersService],
 })

@@ -71,39 +71,72 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
   Widget build(BuildContext context) {
     final devOtp = ref.read(authControllerProvider.notifier).devOtp;
     return Scaffold(
-      backgroundColor: AppTheme.dark,
+      backgroundColor: AppTheme.background,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const SizedBox(height: 48),
-            const Icon(Icons.shopping_bag, color: AppTheme.red, size: 56),
-            const SizedBox(height: 16),
-            const Text(
-              'RedKS',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.red,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.red.withValues(alpha: 0.22),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Image.asset('assets/images/redks_logo.png', width: 68),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'RedKS',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          'Har Dukaan, Ghar Tak.',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Text(
-              'Har Dukaan, Ghar Tak.',
-              style: TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 36),
+            const SizedBox(height: 18),
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Login with OTP',
+                      'Login with mobile OTP',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Shop nearby stores, request any item, and track orders from one trusted local app.',
+                      style: TextStyle(color: AppTheme.muted),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -111,6 +144,7 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
                       keyboardType: TextInputType.phone,
                       decoration: const InputDecoration(
                         labelText: 'Mobile number',
+                        prefixText: '+91 ',
                       ),
                     ),
                     if (otpRequested) ...[
@@ -131,7 +165,10 @@ class _OtpLoginScreenState extends ConsumerState<OtpLoginScreen> {
                         padding: const EdgeInsets.only(top: 12),
                         child: Text(
                           error!,
-                          style: const TextStyle(color: Colors.red),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     const SizedBox(height: 18),

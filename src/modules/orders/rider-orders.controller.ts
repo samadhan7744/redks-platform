@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { OrdersService } from './orders.service';
+import { RejectOrderDto } from './dto/reject-order.dto';
 
 @ApiTags('Rider Orders')
 @ApiBearerAuth()
@@ -24,6 +25,15 @@ export class RiderOrdersController {
   @Patch(':id/accept')
   accept(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.ordersService.riderAccept(user.sub, id);
+  }
+
+  @Patch(':id/reject')
+  reject(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RejectOrderDto,
+  ) {
+    return this.ordersService.riderReject(user.sub, id, dto.reason);
   }
 
   @Patch(':id/pickup')

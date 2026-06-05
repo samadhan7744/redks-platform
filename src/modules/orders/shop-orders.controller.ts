@@ -28,7 +28,11 @@ export class ShopOrdersController {
   }
 
   @Patch(':id/reject')
-  reject(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: RejectOrderDto) {
+  reject(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RejectOrderDto,
+  ) {
     return this.ordersService.shopReject(user, id, dto.reason);
   }
 

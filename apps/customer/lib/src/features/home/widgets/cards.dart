@@ -20,6 +20,12 @@ class CategoryChip extends StatelessWidget {
       label: Text(category.name),
       selected: selected,
       selectedColor: AppTheme.red.withValues(alpha: 0.15),
+      backgroundColor: Colors.white,
+      side: const BorderSide(color: AppTheme.border),
+      labelStyle: TextStyle(
+        color: selected ? AppTheme.red : AppTheme.dark,
+        fontWeight: FontWeight.w800,
+      ),
       onSelected: (_) => onTap(),
     );
   }
@@ -33,20 +39,89 @@ class ShopCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListTile(
+      child: InkWell(
         onTap: onTap,
-        leading: const CircleAvatar(
-          backgroundColor: AppTheme.red,
-          child: Icon(Icons.store, color: Colors.white),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                height: 54,
+                width: 54,
+                decoration: BoxDecoration(
+                  color: AppTheme.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.storefront, color: AppTheme.red),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      shop.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${shop.city?.name ?? 'City'} / ${shop.zone?.name ?? 'Zone'}',
+                      style: const TextStyle(color: AppTheme.muted),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const _MiniBadge(
+                          Icons.verified_outlined,
+                          'Trusted shop',
+                        ),
+                        const SizedBox(width: 8),
+                        const _MiniBadge(Icons.schedule, 'Quick delivery'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppTheme.muted),
+            ],
+          ),
         ),
-        title: Text(
-          shop.name,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-        subtitle: Text(
-          '${shop.city?.name ?? 'City'} · ${shop.zone?.name ?? 'Zone'}',
-        ),
-        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  const _MiniBadge(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppTheme.green),
+          const SizedBox(width: 4),
+          Text(
+            label.replaceAll('_', ' '),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.dark,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -75,11 +150,11 @@ class ProductCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                height: 86,
+                height: 92,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F2F4),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppTheme.red.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
                   Icons.inventory_2_outlined,
@@ -94,11 +169,25 @@ class ProductCard extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 4),
-              Text('₹${product.price.toStringAsFixed(0)} · ${product.unit}'),
+              Text(
+                '₹${product.price.toStringAsFixed(0)} · ${product.unit}',
+                style: const TextStyle(
+                  color: AppTheme.dark,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                product.stock > 0 ? 'In stock' : 'Out of stock',
+                style: TextStyle(
+                  color: product.stock > 0 ? AppTheme.green : Colors.red,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton(
+                child: FilledButton.tonal(
                   onPressed: product.stock > 0 ? onAdd : null,
                   child: const Text('Add'),
                 ),
