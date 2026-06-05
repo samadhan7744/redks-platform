@@ -15,6 +15,7 @@ const activeOrderStatuses: OrderStatus[] = [
   OrderStatus.PICKED_UP,
   OrderStatus.OUT_FOR_DELIVERY,
 ];
+const missingDistanceKm = Number.MAX_SAFE_INTEGER;
 
 type Candidate = {
   id: string;
@@ -89,36 +90,58 @@ export class AssignmentService {
 
     const now = new Date();
     return this.prisma.$transaction(async (tx) => {
-      await tx.riderAssignmentAttempt.create({
-        data: {
-          orderId,
-          riderId: best.id,
-          status: RiderAssignmentAttemptStatus.OFFERED,
-          distanceKm: Number.isFinite(best.distanceKm)
-            ? best.distanceKm
-            : undefined,
+      const assigned = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          riderId: null,
+          status: OrderStatus.READY_FOR_PICKUP,
+          assignmentAttempts: { lt: maxAssignmentAttempts },
         },
-      });
-      await tx.riderProfile.update({
-        where: { id: best.id },
-        data: { availabilityStatus: RiderAvailabilityStatus.BUSY },
-      });
-      return tx.order.update({
-        where: { id: orderId },
         data: {
           riderId: best.id,
           status: OrderStatus.ASSIGNED,
           assignedAt: now,
           lastAssignmentAt: now,
           assignmentAttempts: { increment: 1 },
-          delivery: {
-            update: {
-              riderId: best.id,
-              status: DeliveryStatus.ASSIGNED,
-              assignedAt: now,
-            },
-          },
         },
+      });
+      if (assigned.count !== 1) return null;
+
+      await tx.riderAssignmentAttempt.create({
+        data: {
+          orderId,
+          riderId: best.id,
+          status: RiderAssignmentAttemptStatus.OFFERED,
+          distanceKm: best.distanceKm !== missingDistanceKm
+            ? best.distanceKm
+            : undefined,
+        },
+      });
+      await tx.riderProfile.update({
+        where: { id: best.id },
+        data: {
+          availabilityStatus:
+            best.activeOrdersCount + 1 >= maxActiveOrdersPerRider
+              ? RiderAvailabilityStatus.BUSY
+              : RiderAvailabilityStatus.ONLINE,
+        },
+      });
+      await tx.delivery.upsert({
+        where: { orderId },
+        update: {
+          riderId: best.id,
+          status: DeliveryStatus.ASSIGNED,
+          assignedAt: now,
+        },
+        create: {
+          orderId,
+          riderId: best.id,
+          status: DeliveryStatus.ASSIGNED,
+          assignedAt: now,
+        },
+      });
+      return tx.order.findUnique({
+        where: { id: orderId },
         include: {
           customer: true,
           shop: true,
@@ -162,6 +185,10 @@ export class AssignmentService {
   }
 
   async hasOtherActiveOrders(riderId: string, excludingOrderId?: string) {
+    return (await this.activeOrderCount(riderId, excludingOrderId)) > 0;
+  }
+
+  async activeOrderCount(riderId: string, excludingOrderId?: string) {
     const count = await this.prisma.order.count({
       where: {
         riderId,
@@ -169,7 +196,7 @@ export class AssignmentService {
         status: { in: activeOrderStatuses },
       },
     });
-    return count > 0;
+    return count;
   }
 
   private async latestAttempt(orderId: string, riderId: string) {
@@ -214,7 +241,7 @@ export class AssignmentService {
     const lat2 = Number(lat2Value);
     const lon2 = Number(lon2Value);
     if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) {
-      return Number.POSITIVE_INFINITY;
+      return missingDistanceKm;
     }
     const toRadians = (value: number) => (value * Math.PI) / 180;
     const earthRadiusKm = 6371;

@@ -384,11 +384,36 @@ export class OrdersService {
     ) {
       throw new ForbiddenException('Order is outside your delivery zone');
     }
+    const activeOrderCount = await this.assignmentService.activeOrderCount(
+      rider.id,
+    );
+    if (activeOrderCount >= 3) {
+      throw new BadRequestException('Rider has maximum active orders');
+    }
+    const nextAvailabilityStatus =
+      activeOrderCount + 1 >= 3
+        ? RiderAvailabilityStatus.BUSY
+        : RiderAvailabilityStatus.ONLINE;
     return ok(
       await this.prisma.$transaction(async (tx) => {
+        const assigned = await tx.order.updateMany({
+          where: {
+            id: orderId,
+            riderId: null,
+            status: OrderStatus.READY_FOR_PICKUP,
+          },
+          data: {
+            riderId: rider.id,
+            status: OrderStatus.ASSIGNED,
+            assignedAt: new Date(),
+          },
+        });
+        if (assigned.count !== 1) {
+          throw new BadRequestException('Order already assigned');
+        }
         await tx.riderProfile.update({
           where: { id: rider.id },
-          data: { availabilityStatus: RiderAvailabilityStatus.BUSY },
+          data: { availabilityStatus: nextAvailabilityStatus },
         });
         await tx.riderAssignmentAttempt.create({
           data: {
@@ -397,19 +422,22 @@ export class OrdersService {
             status: RiderAssignmentAttemptStatus.ACCEPTED,
           },
         });
-        return tx.order.update({
-          where: { id: orderId },
-          data: {
+        await tx.delivery.upsert({
+          where: { orderId },
+          update: {
             riderId: rider.id,
-            status: OrderStatus.ASSIGNED,
-            delivery: {
-              update: {
-                riderId: rider.id,
-                status: DeliveryStatus.ASSIGNED,
-                assignedAt: new Date(),
-              },
-            },
+            status: DeliveryStatus.ASSIGNED,
+            assignedAt: new Date(),
           },
+          create: {
+            orderId,
+            riderId: rider.id,
+            status: DeliveryStatus.ASSIGNED,
+            assignedAt: new Date(),
+          },
+        });
+        return tx.order.findUnique({
+          where: { id: orderId },
           include: this.orderInclude(),
         });
       }),
@@ -509,13 +537,19 @@ export class OrdersService {
     );
     if (order.status !== OrderStatus.OUT_FOR_DELIVERY)
       throw new BadRequestException('Order is not out for delivery');
+    const otherActiveOrderCount =
+      await this.assignmentService.activeOrderCount(rider.id, orderId);
     return ok(
       await this.prisma.$transaction(async (tx) => {
         await tx.riderProfile.update({
           where: { id: rider.id },
           data: {
-            availabilityStatus: RiderAvailabilityStatus.ONLINE,
-            lastAvailableAt: new Date(),
+            availabilityStatus:
+              otherActiveOrderCount > 0
+                ? RiderAvailabilityStatus.BUSY
+                : RiderAvailabilityStatus.ONLINE,
+            lastAvailableAt:
+              otherActiveOrderCount > 0 ? undefined : new Date(),
           },
         });
         return tx.order.update({

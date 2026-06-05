@@ -4,52 +4,78 @@ import {
   OrderStatus,
   RiderAssignmentAttemptStatus,
   RiderAvailabilityStatus,
-  RiderStatus,
 } from '@prisma/client';
 import { AssignmentService } from '../src/modules/assignment/assignment.service';
 
 const createdAt = (value: string) => new Date(value);
 
-async function testAssignsNearestEligibleRider() {
+function readyOrder(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'order_1',
+    status: OrderStatus.READY_FOR_PICKUP,
+    assignmentAttempts: 0,
+    shop: {
+      cityId: 'city_1',
+      zoneId: 'zone_1',
+      latitude: 12.9716,
+      longitude: 77.5946,
+    },
+    assignmentHistory: [],
+    ...overrides,
+  };
+}
+
+function assignmentPrismaMock(options: {
+  activeCounts?: Array<{ riderId: string; count: number }>;
+  assignmentUpdateCount?: number;
+  riders?: Array<Record<string, unknown>>;
+}) {
   const writes: Array<{ type: string; payload: unknown }> = [];
+  let findUniqueCalls = 0;
+  let assignedRiderId: string | null = null;
+  const riders =
+    options.riders ??
+    [
+      {
+        id: 'rider_far',
+        createdAt: createdAt('2026-01-01'),
+        currentLatitude: 13.2,
+        currentLongitude: 77.7,
+      },
+      {
+        id: 'rider_near',
+        createdAt: createdAt('2026-02-01'),
+        currentLatitude: 12.972,
+        currentLongitude: 77.595,
+      },
+    ];
   const prisma = {
     order: {
-      findUnique: async () => ({
-        id: 'order_1',
-        status: OrderStatus.READY_FOR_PICKUP,
-        assignmentAttempts: 0,
-        shop: {
-          cityId: 'city_1',
-          zoneId: 'zone_1',
-          latitude: 12.9716,
-          longitude: 77.5946,
-        },
-        assignmentHistory: [],
-      }),
-      groupBy: async () => [
-        { riderId: 'rider_far', _count: { _all: 0 } },
-        { riderId: 'rider_near', _count: { _all: 1 } },
-      ],
-      update: async ({ data }: { data: unknown }) => {
-        writes.push({ type: 'order.update', payload: data });
-        return { id: 'order_1', riderId: 'rider_near', status: OrderStatus.ASSIGNED };
+      findUnique: async () =>
+        findUniqueCalls++ === 0
+          ? readyOrder()
+          : { id: 'order_1', riderId: assignedRiderId, status: OrderStatus.ASSIGNED },
+      groupBy: async () =>
+        (options.activeCounts ?? [
+          { riderId: 'rider_far', count: 0 },
+          { riderId: 'rider_near', count: 1 },
+        ]).map((row) => ({
+          riderId: row.riderId,
+          _count: { _all: row.count },
+        })),
+      updateMany: async ({ data }: { data: unknown }) => {
+        assignedRiderId = (data as { riderId?: string }).riderId ?? null;
+        writes.push({ type: 'order.updateMany', payload: data });
+        return { count: options.assignmentUpdateCount ?? 1 };
+      },
+    },
+    delivery: {
+      upsert: async ({ update }: { update: unknown }) => {
+        writes.push({ type: 'delivery.upsert', payload: update });
       },
     },
     riderProfile: {
-      findMany: async () => [
-        {
-          id: 'rider_far',
-          createdAt: createdAt('2026-01-01'),
-          currentLatitude: 13.2,
-          currentLongitude: 77.7,
-        },
-        {
-          id: 'rider_near',
-          createdAt: createdAt('2026-02-01'),
-          currentLatitude: 12.972,
-          currentLongitude: 77.595,
-        },
-      ],
+      findMany: async () => riders,
       update: async ({ data }: { data: unknown }) => {
         writes.push({ type: 'rider.update', payload: data });
       },
@@ -63,37 +89,112 @@ async function testAssignsNearestEligibleRider() {
     },
     $transaction: async (callback: (tx: unknown) => unknown) => callback(prisma),
   };
+  return { prisma, writes };
+}
 
+async function testAssignsNearestEligibleRiderWithoutPrematureBusy() {
+  const { prisma, writes } = assignmentPrismaMock({});
   const service = new AssignmentService(prisma as never);
   const result = await service.assignBestRider('order_1');
 
   assert.equal(result?.riderId, 'rider_near');
-  assert.deepEqual(writes[0], {
+  assert.equal(writes[0].type, 'order.updateMany');
+  assert.deepEqual(writes[1], {
     type: 'attempt.create',
     payload: {
       orderId: 'order_1',
       riderId: 'rider_near',
       status: RiderAssignmentAttemptStatus.OFFERED,
-      distanceKm: writes[0].payload['distanceKm'],
+      distanceKm: writes[1].payload['distanceKm'],
     },
   });
-  assert.equal(writes[1].type, 'rider.update');
-  assert.deepEqual(writes[1].payload, {
-    availabilityStatus: RiderAvailabilityStatus.BUSY,
+  assert.deepEqual(writes[2], {
+    type: 'rider.update',
+    payload: { availabilityStatus: RiderAvailabilityStatus.ONLINE },
   });
-  assert.equal(writes[2].type, 'order.update');
+  assert.deepEqual(writes[3], {
+    type: 'delivery.upsert',
+    payload: {
+      riderId: 'rider_near',
+      status: DeliveryStatus.ASSIGNED,
+      assignedAt: writes[3].payload['assignedAt'],
+    },
+  });
+}
+
+async function testDuplicateAssignmentPrevention() {
+  const { prisma, writes } = assignmentPrismaMock({ assignmentUpdateCount: 0 });
+  const service = new AssignmentService(prisma as never);
+  const result = await service.assignBestRider('order_1');
+
+  assert.equal(result, null);
+  assert.deepEqual(
+    writes.map((write) => write.type),
+    ['order.updateMany'],
+  );
+}
+
+async function testRiderWithOneActiveOrderStillEligible() {
+  const { prisma } = assignmentPrismaMock({
+    activeCounts: [
+      { riderId: 'rider_far', count: 0 },
+      { riderId: 'rider_near', count: 1 },
+    ],
+  });
+  const service = new AssignmentService(prisma as never);
+  const result = await service.assignBestRider('order_1');
+
+  assert.equal(result?.riderId, 'rider_near');
+}
+
+async function testRiderWithThreeActiveOrdersExcluded() {
+  const { prisma } = assignmentPrismaMock({
+    activeCounts: [
+      { riderId: 'rider_far', count: 0 },
+      { riderId: 'rider_near', count: 3 },
+    ],
+  });
+  const service = new AssignmentService(prisma as never);
+  const result = await service.assignBestRider('order_1');
+
+  assert.equal(result?.riderId, 'rider_far');
+}
+
+async function testMissingLatLongDoesNotBreakSorting() {
+  const { prisma } = assignmentPrismaMock({
+    riders: [
+      {
+        id: 'rider_missing_location',
+        createdAt: createdAt('2026-01-01'),
+        currentLatitude: null,
+        currentLongitude: null,
+      },
+      {
+        id: 'rider_with_location',
+        createdAt: createdAt('2026-02-01'),
+        currentLatitude: 12.972,
+        currentLongitude: 77.595,
+      },
+    ],
+    activeCounts: [
+      { riderId: 'rider_missing_location', count: 0 },
+      { riderId: 'rider_with_location', count: 0 },
+    ],
+  });
+  const service = new AssignmentService(prisma as never);
+  const result = await service.assignBestRider('order_1');
+
+  assert.equal(result?.riderId, 'rider_with_location');
 }
 
 async function testSkipsWhenMaxAttemptsReached() {
   const prisma = {
     order: {
-      findUnique: async () => ({
-        id: 'order_2',
-        status: OrderStatus.READY_FOR_PICKUP,
-        assignmentAttempts: 5,
-        shop: { cityId: 'city_1', zoneId: 'zone_1' },
-        assignmentHistory: [],
-      }),
+      findUnique: async () =>
+        readyOrder({
+          id: 'order_2',
+          assignmentAttempts: 5,
+        }),
     },
   };
   const service = new AssignmentService(prisma as never);
@@ -117,7 +218,11 @@ async function testRejectMarksAttempt() {
 }
 
 void (async () => {
-  await testAssignsNearestEligibleRider();
+  await testAssignsNearestEligibleRiderWithoutPrematureBusy();
+  await testDuplicateAssignmentPrevention();
+  await testRiderWithOneActiveOrderStillEligible();
+  await testRiderWithThreeActiveOrdersExcluded();
+  await testMissingLatLongDoesNotBreakSorting();
   await testSkipsWhenMaxAttemptsReached();
   await testRejectMarksAttempt();
   console.log('assignment service tests passed');
