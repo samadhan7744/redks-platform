@@ -22,6 +22,11 @@ export class RiderOrdersController {
     return this.ordersService.findAvailableForRider(user.sub);
   }
 
+  @Get('active')
+  active(@CurrentUser() user: AuthUser) {
+    return this.ordersService.findActiveForRider(user.sub);
+  }
+
   @Patch(':id/accept')
   accept(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.ordersService.riderAccept(user.sub, id);

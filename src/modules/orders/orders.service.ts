@@ -368,6 +368,26 @@ export class OrdersService {
     );
   }
 
+  async findActiveForRider(userId: string) {
+    const rider = await this.findApprovedRider(userId);
+    return ok(
+      await this.prisma.order.findMany({
+        where: {
+          riderId: rider.id,
+          status: {
+            in: [
+              OrderStatus.ASSIGNED,
+              OrderStatus.PICKED_UP,
+              OrderStatus.OUT_FOR_DELIVERY,
+            ],
+          },
+        },
+        include: this.orderInclude(),
+        orderBy: { assignedAt: 'asc' },
+      }),
+    );
+  }
+
   async riderAccept(userId: string, orderId: string) {
     const rider = await this.findApprovedRider(userId);
     const order = await this.prisma.order.findUnique({

@@ -10,7 +10,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "test": "tsx test/order-calculation.test.ts && tsx test/assignment-service.test.ts && tsx test/order-assignment.integration.test.ts",
+    "test": "tsx test/order-calculation.test.ts && tsx test/assignment-service.test.ts && tsx test/order-assignment.integration.test.ts && tsx test/tracking-service.test.ts",
     "health:perf": "tsx scripts/health-perf.ts",
     "lint": "eslint \"{src,prisma,test}/**/*.ts\" --fix",
     "prisma:generate": "prisma generate",
@@ -24,13 +24,16 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/platform-express": "^11.1.24",
+    "@nestjs/platform-socket.io": "^11.1.24",
     "@nestjs/swagger": "^11.4.4",
+    "@nestjs/websockets": "^11.1.24",
     "@prisma/client": "^6.1.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "ioredis": "^5.4.2",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.21",

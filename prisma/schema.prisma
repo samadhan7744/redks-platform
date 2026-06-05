@@ -542,6 +542,7 @@ model RiderProfile {
   deliveries            Delivery[]
   assignedOrders        Order[]                  @relation("AssignedRiderOrders")
   assignmentAttempts    RiderAssignmentAttempt[]
+  locations             RiderLocation[]
   verificationDocuments VerificationDocument[]   @relation("RiderVerificationDocuments")
   shopRiders            ShopRider[]
 
@@ -639,6 +640,21 @@ model Order {
   @@index([shopId, riderId, status])
   @@index([status, assignmentAttempts])
   @@index([assignedAt])
+}
+
+model RiderLocation {
+  id         String       @id @default(cuid())
+  riderId    String
+  latitude   Decimal      @db.Decimal(10, 7)
+  longitude  Decimal      @db.Decimal(10, 7)
+  accuracy   Decimal?     @db.Decimal(10, 2)
+  speed      Decimal?     @db.Decimal(10, 2)
+  heading    Decimal?     @db.Decimal(10, 2)
+  recordedAt DateTime     @default(now())
+  rider      RiderProfile @relation(fields: [riderId], references: [id])
+
+  @@index([riderId])
+  @@index([recordedAt])
 }
 
 model RiderAssignmentAttempt {

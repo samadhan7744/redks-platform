@@ -190,10 +190,31 @@ class PartnerRepository {
       .list(await client.dio.get('/rider/orders/available'))
       .map(OrderModel.fromJson)
       .toList();
+  Future<List<OrderModel>> activeRiderOrders() async => client
+      .list(await client.dio.get('/rider/orders/active'))
+      .map(OrderModel.fromJson)
+      .toList();
   Future<void> acceptDelivery(String id) async =>
       client.dio.patch('/rider/orders/$id/accept');
   Future<void> pickupOrder(String id) async =>
       client.dio.patch('/rider/orders/$id/pickup');
   Future<void> deliverOrder(String id) async =>
       client.dio.patch('/rider/orders/$id/deliver');
+
+  Future<void> updateRiderLocation({
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? speed,
+    double? heading,
+  }) async {
+    final data = <String, dynamic>{
+      'latitude': latitude,
+      'longitude': longitude,
+      'accuracy': accuracy,
+      'speed': speed,
+      'heading': heading,
+    }..removeWhere((key, value) => value == null);
+    await client.dio.post('/riders/me/location', data: data);
+  }
 }

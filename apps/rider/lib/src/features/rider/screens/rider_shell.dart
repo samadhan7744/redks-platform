@@ -6,16 +6,31 @@ import '../../../core/widgets/widgets.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repositories/partner_repository.dart';
 import '../../auth/auth_controller.dart';
+import '../location_tracking_service.dart';
 
-class RiderShell extends StatefulWidget {
+class RiderShell extends ConsumerStatefulWidget {
   const RiderShell({super.key});
 
   @override
-  State<RiderShell> createState() => _RiderShellState();
+  ConsumerState<RiderShell> createState() => _RiderShellState();
 }
 
-class _RiderShellState extends State<RiderShell> {
+class _RiderShellState extends ConsumerState<RiderShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(
+      () => ref.read(locationTrackingServiceProvider).start(),
+    );
+  }
+
+  @override
+  void dispose() {
+    ref.read(locationTrackingServiceProvider).stop();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +162,11 @@ class _RiderDashboardScreenState extends ConsumerState<RiderDashboardScreen> {
                   value:
                       '${profile.city?.name ?? '-'} / ${profile.zone?.name ?? '-'}',
                   icon: Icons.location_on_outlined,
+                ),
+                const MetricCard(
+                  label: 'Live tracking',
+                  value: 'Auto while assigned',
+                  icon: Icons.my_location_outlined,
                 ),
                 const SizedBox(height: 8),
                 PrimaryButton(

@@ -17,6 +17,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { RidersModule } from './modules/riders/riders.module';
 import { ShopsModule } from './modules/shops/shops.module';
+import { TrackingModule } from './modules/tracking/tracking.module';
 import { UsersModule } from './modules/users/users.module';
 import { ZonesModule } from './modules/zones/zones.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
@@ -58,6 +59,7 @@ import { RedisModule } from './redis/redis.module';
     NotificationsModule,
     ReviewsModule,
     RidersModule,
+    TrackingModule,
     AdminModule,
   ],
 })
