@@ -266,6 +266,7 @@ model User {
   @@index([phone])
   @@index([roles], type: Gin)
   @@index([status])
+  @@index([createdAt])
 }
 
 model Address {
@@ -411,6 +412,7 @@ model Shop {
   @@index([cityId, zoneId])
   @@index([status])
   @@index([zoneId])
+  @@index([createdAt])
   @@index([cityId, zoneId, status])
   @@index([latitude, longitude])
   @@index([categoryId, status])
@@ -595,6 +597,7 @@ model RiderProfile {
   @@index([cityId, zoneId, status])
   @@index([availabilityStatus, zoneId])
   @@index([status, availabilityStatus])
+  @@index([createdAt])
 }
 
 model ShopRider {
@@ -680,6 +683,9 @@ model Order {
   @@index([riderId])
   @@index([status])
   @@index([placedAt])
+  @@index([paymentStatus, placedAt])
+  @@index([paymentMethod, placedAt])
+  @@index([status, placedAt])
   @@index([customerId, status])
   @@index([shopId, status])
   @@index([riderId, status])
@@ -778,6 +784,8 @@ model Payment {
   @@index([orderId])
   @@index([status])
   @@index([method, status])
+  @@index([status, createdAt])
+  @@index([method, status, createdAt])
   @@index([providerPaymentId])
   @@index([idempotencyKey])
 }

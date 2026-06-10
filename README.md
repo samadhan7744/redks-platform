@@ -182,6 +182,13 @@ The seed script creates:
 - `PATCH /api/v1/admin/templates/:id`
 - `GET /api/v1/admin/reviews`
 - `PATCH /api/v1/admin/reviews/:id/status`
+- `GET /api/v1/admin/analytics/overview`
+- `GET /api/v1/admin/analytics/revenue`
+- `GET /api/v1/admin/analytics/orders`
+- `GET /api/v1/admin/analytics/customers`
+- `GET /api/v1/admin/analytics/shops`
+- `GET /api/v1/admin/analytics/riders`
+- `GET /api/v1/admin/analytics/payments`
 - `PATCH /api/v1/delivery/rider/availability`
 - `GET /health`
 
@@ -227,6 +234,24 @@ Sprint-06 supports typed customer reviews for delivered orders:
 - shop owners can reply only to reviews belonging to their shop
 
 Published review aggregates update `averageRating` and `ratingCount` for shops, products, and riders. New shop reviews, rider reviews, and review replies create in-app notifications.
+
+## Admin Analytics
+
+Sprint-07 adds admin-only analytics endpoints under `/api/v1/admin/analytics`.
+
+Supported filters where applicable:
+
+```text
+startDate=2026-06-01
+endDate=2026-06-30
+cityId=city_cuid
+shopId=shop_cuid
+groupBy=day|week|month
+page=1
+limit=10
+```
+
+Invalid date ranges are rejected. Overview returns business cards such as revenue, order counts, active shops/riders, average order value, COD pending amount, online paid amount, and failed payment count. Revenue, orders, customers, shops, riders, and payments endpoints return breakdowns and chart-friendly trend arrays.
 
 ## Payment Setup and Testing
 
