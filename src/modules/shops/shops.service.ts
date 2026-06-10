@@ -18,6 +18,7 @@ import {
   paginationParams,
 } from '../../common/utils/api-response.util';
 import { MapsService } from '../maps/maps.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { CreateShopDto } from './dto/create-shop.dto';
@@ -40,6 +41,7 @@ export class ShopsService {
     private readonly prisma: PrismaService,
     private readonly mapsService: MapsService,
     private readonly redisService?: RedisService,
+    private readonly notificationsService?: NotificationsService,
   ) {}
 
   async findPublic(query: ShopQueryDto) {
@@ -319,6 +321,16 @@ export class ShopsService {
       },
       include: this.shopInclude(),
     });
+    if (dto.status === ShopStatus.APPROVED) {
+      await this.notificationsService?.notifyShopApproved(shop.ownerId, shop.id);
+    }
+    if (dto.status === ShopStatus.REJECTED) {
+      await this.notificationsService?.notifyShopRejected(
+        shop.ownerId,
+        shop.id,
+        dto.rejectionReason,
+      );
+    }
     return ok(shop, 'Shop status updated');
   }
 

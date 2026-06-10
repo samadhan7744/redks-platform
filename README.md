@@ -81,6 +81,11 @@ OTP_DEV_CODE=123456
 OTP_MAX_ATTEMPTS=5
 ADMIN_PHONE=9999999999
 ADMIN_EMAIL=admin@redks.in
+RAZORPAY_KEY_ID=rzp_test_xxxxx
+RAZORPAY_KEY_SECRET=change-me
+RAZORPAY_WEBHOOK_SECRET=change-me-webhook-secret
+RAZORPAY_API_BASE_URL=https://api.razorpay.com/v1
+RAZORPAY_TIMEOUT_MS=10000
 ```
 
 ## Seed Data
@@ -132,6 +137,18 @@ The seed script creates:
 - `GET /api/v1/orders/my-orders`
 - `GET /api/v1/orders/:id`
 - `PATCH /api/v1/orders/:id/cancel`
+- `POST /api/v1/payments/razorpay/orders`
+- `POST /api/v1/payments/razorpay/verify`
+- `GET /api/v1/payments/order/:orderId`
+- `POST /api/v1/payments/webhooks/razorpay`
+- `GET /api/v1/notifications`
+- `PATCH /api/v1/notifications/:id/read`
+- `POST /api/v1/reviews`
+- `GET /api/v1/reviews/my`
+- `POST /api/v1/reviews/:id/reply`
+- `GET /api/v1/shops/:shopId/reviews`
+- `GET /api/v1/products/:productId/reviews`
+- `GET /api/v1/shops/me/reviews`
 - `GET /api/v1/shop/orders`
 - `PATCH /api/v1/shop/orders/:id/accept`
 - `PATCH /api/v1/shop/orders/:id/reject`
@@ -158,6 +175,13 @@ The seed script creates:
 - `GET /api/v1/admin/products`
 - `GET /api/v1/admin/item-requests`
 - `GET /api/v1/admin/dashboard/summary`
+- `GET /api/v1/admin/notifications`
+- `GET /api/v1/admin/notifications/:id`
+- `GET /api/v1/admin/templates`
+- `POST /api/v1/admin/templates`
+- `PATCH /api/v1/admin/templates/:id`
+- `GET /api/v1/admin/reviews`
+- `PATCH /api/v1/admin/reviews/:id/status`
 - `PATCH /api/v1/delivery/rider/availability`
 - `GET /health`
 
@@ -170,13 +194,55 @@ The seed script creates:
 - JWT access-token expiry is controlled by `JWT_EXPIRES_IN`.
 - Refresh tokens are issued as a placeholder response. A later phase should persist hashed refresh tokens with rotation, device metadata, and revoke-at timestamps.
 - Keep `JWT_SECRET` and `JWT_REFRESH_SECRET` different in production.
+- Razorpay secrets must stay server-side in `.env`; never expose `RAZORPAY_KEY_SECRET` or `RAZORPAY_WEBHOOK_SECRET` to the admin or mobile apps.
+- Online payment amounts are recalculated from the stored order total. The client only receives the public Razorpay key id, provider order id, amount, currency, and RedKS payment id.
+- Razorpay payment verification uses server-side HMAC signature validation. Webhooks also verify `x-razorpay-signature` against the raw request body and store event ids to prevent duplicate updates.
 - List endpoints use a common response shape with `success`, `message`, `data`, and paginated `meta` where applicable.
 - Order creation uses a Prisma transaction and reserves stock immediately when the order is created. If the customer cancels or the shop rejects before fulfillment, stock is restored.
+- COD orders create a `COD_PENDING` payment and move to `COD_COLLECTED` only when the rider marks delivery complete.
+- Shop owners cannot accept ONLINE orders until payment status is `PAID`.
+- Notifications are persisted in-app and dispatched through a provider abstraction. Sprint-05 uses mock SMS, WhatsApp, push, and email providers; future production adapters should plug in Twilio, MSG91, Firebase FCM, WhatsApp Business API, and SendGrid without changing caller modules.
+- Users can read only their own notifications. Admin and super admin roles can inspect all notifications and manage notification templates.
+
+## Notification Setup and Testing
+
+Sprint-05 creates notification records for authentication, orders, payments, shop approvals, and rider approvals.
+
+- User inbox: `GET /api/v1/notifications?page=1&limit=20`
+- Mark read: `PATCH /api/v1/notifications/:id/read`
+- Admin visibility: `GET /api/v1/admin/notifications`
+- Templates: `GET/POST/PATCH /api/v1/admin/templates`
+
+Templates support simple variable interpolation with `{{variableName}}`. Outbound provider calls are mocked for now and update notification status to `SENT` or `FAILED`; real provider secrets should be introduced only in `.env` when those adapters are implemented.
+
+## Reviews and Ratings
+
+Sprint-06 supports typed customer reviews for delivered orders:
+
+- `SHOP`, `ORDER`, `RIDER`, and `PRODUCT` review types
+- one review per order/customer/type/product target
+- product reviews only for products included in the delivered order
+- public review APIs return only `PUBLISHED` reviews
+- admin moderation can set reviews to `PUBLISHED`, `HIDDEN`, or `FLAGGED`
+- shop owners can reply only to reviews belonging to their shop
+
+Published review aggregates update `averageRating` and `ratingCount` for shops, products, and riders. New shop reviews, rider reviews, and review replies create in-app notifications.
+
+## Payment Setup and Testing
+
+1. Create Razorpay test keys and set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` in `.env`.
+2. Create an order with `paymentMethod: "ONLINE"` using `POST /api/v1/orders`.
+3. Create the gateway order with `POST /api/v1/payments/razorpay/orders` and the RedKS `orderId`.
+4. Open Razorpay Checkout in the client using the returned `keyId`, `providerOrderId`, `amount`, and `currency`.
+5. Send the Checkout response to `POST /api/v1/payments/razorpay/verify`.
+6. Configure the Razorpay webhook URL as `https://<backend-host>/api/v1/payments/webhooks/razorpay`.
+
+For local webhook testing, expose the backend with a tunneling tool and set the same webhook secret in Razorpay and `.env`. The webhook handler currently processes `payment.captured`, `payment.failed`, and `order.paid` idempotently.
 
 ## Notes
 
 - OTP delivery is a placeholder. Development returns `devOtp`; production should integrate an SMS provider.
-- Online payments are modeled but provider integration is intentionally deferred.
+- Online payment uses Razorpay order creation, signature verification, and idempotent webhooks. Refund automation is still a later phase.
 - Shop and rider approvals are modeled and exposed through admin skeleton routes.
 - Shop/category-specific commission overrides are represented by `ShopCategoryCommission`.
 - Rider availability is indexed by city/zone/status for assignment flow readiness.

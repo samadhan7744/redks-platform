@@ -22,6 +22,7 @@ import {
   paginationParams,
 } from '../../common/utils/api-response.util';
 import { AssignmentService } from '../assignment/assignment.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -34,6 +35,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly calculator: OrderCalculationService,
     private readonly assignmentService: AssignmentService,
+    private readonly notificationsService?: NotificationsService,
   ) {}
 
   async create(customerId: string, dto: CreateOrderDto) {
@@ -92,8 +94,7 @@ export class OrdersService {
       commissionPercent: Number(shop.defaultCommissionPercent),
     });
 
-    return ok(
-      await this.prisma.$transaction(async (tx) => {
+    const createdOrder = await this.prisma.$transaction(async (tx) => {
         const order = await tx.order.create({
           data: {
             orderNumber: this.generateOrderNumber(),
@@ -137,9 +138,9 @@ export class OrdersService {
         }
 
         return order;
-      }),
-      'Order created and stock reserved',
-    );
+      });
+    await this.notificationsService?.notifyOrderPlaced(createdOrder);
+    return ok(createdOrder, 'Order created and stock reserved');
   }
 
   async findForCustomer(customerId: string) {
@@ -283,14 +284,21 @@ export class OrdersService {
     const order = await this.assertShopOrder(user, orderId);
     if (order.status !== OrderStatus.PLACED)
       throw new BadRequestException('Only placed orders can be accepted');
-    return ok(
-      await this.prisma.order.update({
+    if (
+      order.paymentMethod === PaymentMethod.ONLINE &&
+      order.paymentStatus !== PaymentStatus.PAID
+    ) {
+      throw new BadRequestException(
+        'Online payment must be completed before accepting this order',
+      );
+    }
+    const acceptedOrder = await this.prisma.order.update({
         where: { id: orderId },
         data: { status: OrderStatus.ACCEPTED },
         include: this.orderInclude(),
-      }),
-      'Order accepted',
-    );
+      });
+    await this.notificationsService?.notifyOrderAccepted(acceptedOrder);
+    return ok(acceptedOrder, 'Order accepted');
   }
 
   async shopReject(user: AuthUser, orderId: string, reason: string) {
@@ -302,8 +310,7 @@ export class OrdersService {
     if (!rejectableStatuses.includes(order.status)) {
       throw new BadRequestException('Order cannot be rejected at this stage');
     }
-    return ok(
-      await this.prisma.$transaction(async (tx) => {
+    const rejectedOrder = await this.prisma.$transaction(async (tx) => {
         for (const item of order.items) {
           await tx.product.update({
             where: { id: item.productId },
@@ -319,9 +326,9 @@ export class OrdersService {
           },
           include: this.orderInclude(),
         });
-      }),
-      'Order rejected and stock restored',
-    );
+      });
+    await this.notificationsService?.notifyOrderCancelled(rejectedOrder);
+    return ok(rejectedOrder, 'Order rejected and stock restored');
   }
 
   async shopReady(user: AuthUser, orderId: string) {
@@ -345,6 +352,15 @@ export class OrdersService {
       include: this.orderInclude(),
     });
     const assignedOrder = await this.assignmentService.assignBestRider(orderId);
+    if (assignedOrder?.riderId) {
+      const latestAssigned = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: this.orderInclude(),
+      });
+      if (latestAssigned) {
+        await this.notificationsService?.notifyRiderAssigned(latestAssigned);
+      }
+    }
     return ok(
       assignedOrder ?? readyOrder,
       assignedOrder
@@ -414,8 +430,7 @@ export class OrdersService {
       activeOrderCount + 1 >= 3
         ? RiderAvailabilityStatus.BUSY
         : RiderAvailabilityStatus.ONLINE;
-    return ok(
-      await this.prisma.$transaction(async (tx) => {
+    const assignedOrder = await this.prisma.$transaction(async (tx) => {
         const assigned = await tx.order.updateMany({
           where: {
             id: orderId,
@@ -460,9 +475,11 @@ export class OrdersService {
           where: { id: orderId },
           include: this.orderInclude(),
         });
-      }),
-      'Order assigned to rider',
-    );
+      });
+    if (assignedOrder) {
+      await this.notificationsService?.notifyRiderAssigned(assignedOrder);
+    }
+    return ok(assignedOrder, 'Order assigned to rider');
   }
 
   async riderReject(
@@ -531,8 +548,7 @@ export class OrdersService {
     );
     if (order.status !== OrderStatus.ASSIGNED)
       throw new BadRequestException('Order is not assigned for pickup');
-    return ok(
-      await this.prisma.order.update({
+    const pickedUpOrder = await this.prisma.order.update({
         where: { id: orderId },
         data: {
           status: OrderStatus.OUT_FOR_DELIVERY,
@@ -545,9 +561,9 @@ export class OrdersService {
           riderId: rider.id,
         },
         include: this.orderInclude(),
-      }),
-      'Order picked up',
-    );
+      });
+    await this.notificationsService?.notifyRiderArrived(pickedUpOrder);
+    return ok(pickedUpOrder, 'Order picked up');
   }
 
   async riderDeliver(userId: string, orderId: string) {
@@ -559,8 +575,7 @@ export class OrdersService {
       throw new BadRequestException('Order is not out for delivery');
     const otherActiveOrderCount =
       await this.assignmentService.activeOrderCount(rider.id, orderId);
-    return ok(
-      await this.prisma.$transaction(async (tx) => {
+    const deliveredOrder = await this.prisma.$transaction(async (tx) => {
         await tx.riderProfile.update({
           where: { id: rider.id },
           data: {
@@ -594,9 +609,9 @@ export class OrdersService {
           },
           include: this.orderInclude(),
         });
-      }),
-      'Order delivered',
-    );
+      });
+    await this.notificationsService?.notifyOrderDelivered(deliveredOrder);
+    return ok(deliveredOrder, 'Order delivered');
   }
 
   private async assertShopOrder(user: AuthUser, orderId: string) {

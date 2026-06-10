@@ -1,10 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ReviewType } from '@prisma/client';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class CreateReviewDto {
   @ApiProperty({ example: 'order_cuid' })
   @IsString()
   orderId: string;
+
+  @ApiProperty({ enum: ReviewType, example: ReviewType.SHOP })
+  @IsEnum(ReviewType)
+  reviewType: ReviewType;
+
+  @ApiPropertyOptional({ example: 'product_cuid' })
+  @IsOptional()
+  @IsString()
+  productId?: string;
 
   @ApiProperty({ example: 5 })
   @IsInt()

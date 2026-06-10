@@ -16,6 +16,7 @@ import {
   paginationParams,
 } from '../../common/utils/api-response.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AdminItemRequestQueryDto } from './dto/admin-item-request-query.dto';
 import { AdminProductQueryDto } from './dto/admin-product-query.dto';
 import { AdminRiderQueryDto } from './dto/admin-rider-query.dto';
@@ -26,7 +27,10 @@ import { UpdateShopDocumentStatusDto } from './dto/update-shop-document-status.d
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async pendingShops() {
     return ok(
@@ -88,8 +92,7 @@ export class AdminService {
   }
 
   async approveShop(adminId: string, shopId: string) {
-    return ok(
-      await this.prisma.shop.update({
+    const shop = await this.prisma.shop.update({
         where: { id: shopId },
         data: {
           status: ShopStatus.APPROVED,
@@ -99,9 +102,9 @@ export class AdminService {
           rejectionReason: null,
         },
         include: this.shopInclude(),
-      }),
-      'Shop approved',
-    );
+      });
+    await this.notificationsService.notifyShopApproved(shop.ownerId, shop.id);
+    return ok(shop, 'Shop approved');
   }
 
   async rejectShop(
@@ -110,8 +113,7 @@ export class AdminService {
     rejectionReason: string,
     reviewNotes?: string,
   ) {
-    return ok(
-      await this.prisma.shop.update({
+    const shop = await this.prisma.shop.update({
         where: { id: shopId },
         data: {
           status: ShopStatus.REJECTED,
@@ -121,9 +123,13 @@ export class AdminService {
           reviewNotes,
         },
         include: this.shopInclude(),
-      }),
-      'Shop rejected',
+      });
+    await this.notificationsService.notifyShopRejected(
+      shop.ownerId,
+      shop.id,
+      rejectionReason,
     );
+    return ok(shop, 'Shop rejected');
   }
 
   async requestShopChanges(
@@ -293,8 +299,7 @@ export class AdminService {
       throw new BadRequestException('Rejection reason is required');
     }
 
-    return ok(
-      await this.prisma.riderProfile.update({
+    const rider = await this.prisma.riderProfile.update({
         where: { id: riderId },
         data: {
           status: dto.status,
@@ -310,9 +315,18 @@ export class AdminService {
               : undefined,
         },
         include: this.riderInclude(),
-      }),
-      'Rider status updated',
-    );
+      });
+    if (dto.status === RiderStatus.APPROVED) {
+      await this.notificationsService.notifyRiderApproved(rider.userId, rider.id);
+    }
+    if (dto.status === RiderStatus.REJECTED) {
+      await this.notificationsService.notifyRiderRejected(
+        rider.userId,
+        rider.id,
+        dto.rejectionReason,
+      );
+    }
+    return ok(rider, 'Rider status updated');
   }
 
   async dashboardSummary() {

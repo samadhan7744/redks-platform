@@ -12,6 +12,7 @@ import { createHash, randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { ok } from '../../common/utils/api-response.util';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async requestOtp(dto: RequestOtpDto) {
@@ -45,6 +47,7 @@ export class AuthService {
       totalMs: performance.now() - totalStart,
       redisSetMs: redisMs,
     });
+    await this.notificationsService.notifyOtpSent(dto.phone);
 
     return {
       success: true,
@@ -123,6 +126,7 @@ export class AuthService {
       },
     );
     const jwtMs = performance.now() - jwtStart;
+    await this.notificationsService.notifyLoginSuccess(user.id);
     this.logTiming('auth/verify-otp', {
       totalMs: performance.now() - totalStart,
       redisGetMs: redisMs,
