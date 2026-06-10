@@ -198,6 +198,27 @@ enum CouponDiscountType {
   FREE_DELIVERY
 }
 
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+  REFUND
+  ADJUSTMENT
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum SettlementStatus {
+  PENDING
+  PROCESSING
+  SETTLED
+  FAILED
+}
+
 enum DeliveryStatus {
   PENDING
   SEARCHING_RIDER
@@ -265,6 +286,8 @@ model User {
   itemRequests      ItemRequest[]
   notifications     Notification[]
   couponUsages      CouponUsage[]
+  wallet            Wallet?
+  walletTransactions WalletTransaction[]
   approvedShops     Shop[]                 @relation("ShopApprovedBy")
   approvedRiders    RiderProfile[]         @relation("RiderApprovedBy")
   shopRiders        ShopRider[]
@@ -411,6 +434,7 @@ model Shop {
   orders                   Order[]
   reviews                  Review[]
   coupons                  Coupon[]
+  settlements              Settlement[]
   itemRequests             ItemRequest[]
   itemRequestQuotes        ItemRequestQuote[]
   verificationDocuments    VerificationDocument[]   @relation("ShopVerificationDocuments")
@@ -688,6 +712,8 @@ model Order {
   paymentEvents      PaymentEvent[]
   coupon             Coupon?                  @relation(fields: [couponId], references: [id])
   couponUsage        CouponUsage?
+  refunds            Refund[]
+  settlements        Settlement[]
   reviews            Review[]
   assignmentHistory  RiderAssignmentAttempt[]
 
@@ -794,6 +820,7 @@ model Payment {
   updatedAt         DateTime       @updatedAt
   order             Order          @relation(fields: [orderId], references: [id])
   events            PaymentEvent[]
+  refunds           Refund[]
 
   @@index([orderId])
   @@index([status])
@@ -870,6 +897,81 @@ model CouponUsage {
   @@index([userId])
   @@index([couponId, userId])
   @@index([usedAt])
+}
+
+model Wallet {
+  id           String              @id @default(cuid())
+  userId       String              @unique
+  balance      Decimal             @default(0) @db.Decimal(10, 2)
+  totalCredits Decimal             @default(0) @db.Decimal(10, 2)
+  totalDebits  Decimal             @default(0) @db.Decimal(10, 2)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  user         User                @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+
+  @@index([userId])
+}
+
+model WalletTransaction {
+  id            String                @id @default(cuid())
+  walletId      String
+  userId        String
+  type          WalletTransactionType
+  amount        Decimal               @db.Decimal(10, 2)
+  referenceType String?
+  referenceId   String?
+  description   String?
+  createdAt     DateTime              @default(now())
+  wallet        Wallet                @relation(fields: [walletId], references: [id])
+  user          User                  @relation(fields: [userId], references: [id])
+
+  @@index([walletId])
+  @@index([userId])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model Refund {
+  id               String       @id @default(cuid())
+  orderId          String
+  paymentId        String
+  amount           Decimal      @db.Decimal(10, 2)
+  reason           String?
+  status           RefundStatus @default(PENDING)
+  providerRefundId String?
+  walletCredit     Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  completedAt      DateTime?
+  order            Order        @relation(fields: [orderId], references: [id])
+  payment          Payment      @relation(fields: [paymentId], references: [id])
+
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Settlement {
+  id               String           @id @default(cuid())
+  shopId           String
+  orderId          String?
+  amount           Decimal          @db.Decimal(10, 2)
+  commissionAmount Decimal          @default(0) @db.Decimal(10, 2)
+  platformFee      Decimal          @default(0) @db.Decimal(10, 2)
+  settlementStatus SettlementStatus @default(PENDING)
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  settledAt        DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  shop             Shop             @relation(fields: [shopId], references: [id])
+  order            Order?           @relation(fields: [orderId], references: [id])
+
+  @@unique([orderId])
+  @@index([shopId])
+  @@index([settlementStatus])
+  @@index([settledAt])
 }
 
 model Notification {

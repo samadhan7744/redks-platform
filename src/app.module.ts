@@ -9,6 +9,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { CitiesModule } from './modules/cities/cities.module';
 import { CouponsModule } from './modules/coupons/coupons.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
+import { FinanceModule } from './modules/finance/finance.module';
 import { HealthModule } from './modules/health/health.module';
 import { ItemRequestsModule } from './modules/item-requests/item-requests.module';
 import { MediaModule } from './modules/media/media.module';
@@ -60,6 +61,7 @@ import { RedisModule } from './redis/redis.module';
     ItemRequestsModule,
     MapsModule,
     MediaModule,
+    FinanceModule,
     DeliveryModule,
     PaymentsModule,
     NotificationsModule,

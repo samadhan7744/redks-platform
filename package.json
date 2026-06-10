@@ -10,7 +10,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "test": "tsx test/order-calculation.test.ts && tsx test/assignment-service.test.ts && tsx test/order-assignment.integration.test.ts && tsx test/tracking-service.test.ts && tsx test/maps-address-shops.test.ts && tsx test/payments.test.ts && tsx test/notifications.test.ts && tsx test/reviews.test.ts && tsx test/analytics.test.ts && tsx test/coupons.test.ts",
+    "test": "tsx test/order-calculation.test.ts && tsx test/assignment-service.test.ts && tsx test/order-assignment.integration.test.ts && tsx test/tracking-service.test.ts && tsx test/maps-address-shops.test.ts && tsx test/payments.test.ts && tsx test/notifications.test.ts && tsx test/reviews.test.ts && tsx test/analytics.test.ts && tsx test/coupons.test.ts && tsx test/finance.test.ts",
     "health:perf": "tsx scripts/health-perf.ts",
     "lint": "eslint \"{src,prisma,test}/**/*.ts\" --fix",
     "prisma:generate": "prisma generate",

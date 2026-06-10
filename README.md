@@ -145,6 +145,8 @@ The seed script creates:
 - `PATCH /api/v1/notifications/:id/read`
 - `POST /api/v1/coupons/validate`
 - `GET /api/v1/coupons/available`
+- `GET /api/v1/wallet`
+- `GET /api/v1/wallet/transactions`
 - `POST /api/v1/reviews`
 - `GET /api/v1/reviews/my`
 - `POST /api/v1/reviews/:id/reply`
@@ -196,6 +198,12 @@ The seed script creates:
 - `PATCH /api/v1/admin/coupons/:id`
 - `DELETE /api/v1/admin/coupons/:id`
 - `GET /api/v1/admin/coupons/analytics/summary`
+- `POST /api/v1/admin/refunds`
+- `GET /api/v1/admin/refunds`
+- `PATCH /api/v1/admin/refunds/:id`
+- `GET /api/v1/admin/settlements`
+- `POST /api/v1/admin/settlements/run`
+- `GET /api/v1/admin/finance/analytics`
 - `PATCH /api/v1/delivery/rider/availability`
 - `GET /health`
 
@@ -271,6 +279,19 @@ Supported discount types:
 - `FREE_DELIVERY`
 
 Coupons can target a city, shop, or category. They support expiry windows, active/disabled state, first-order-only rules, total usage limits, per-user limits, and minimum order value. During order creation the API accepts only `couponCode`; RedKS recalculates the discount server-side and records `CouponUsage` in the same transaction as the order.
+
+## Wallets, Refunds, and Settlements
+
+Sprint-09 adds finance primitives:
+
+- Customer wallet balance and transaction history
+- Admin refund creation and processing
+- Optional wallet-credit refunds
+- Partial and full refund support for `PAID` orders
+- Shop settlement generation for delivered paid/COD-collected orders
+- Finance analytics: total wallet balance, refund totals, pending refunds, settled amount, and pending settlements
+
+Wallet balance updates are transaction-safe and debit operations reject negative balances. Settlement runs create one settlement per order and skip already-settled orders.
 
 ## Payment Setup and Testing
 
