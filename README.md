@@ -143,6 +143,8 @@ The seed script creates:
 - `POST /api/v1/payments/webhooks/razorpay`
 - `GET /api/v1/notifications`
 - `PATCH /api/v1/notifications/:id/read`
+- `POST /api/v1/coupons/validate`
+- `GET /api/v1/coupons/available`
 - `POST /api/v1/reviews`
 - `GET /api/v1/reviews/my`
 - `POST /api/v1/reviews/:id/reply`
@@ -189,6 +191,11 @@ The seed script creates:
 - `GET /api/v1/admin/analytics/shops`
 - `GET /api/v1/admin/analytics/riders`
 - `GET /api/v1/admin/analytics/payments`
+- `GET /api/v1/admin/coupons`
+- `POST /api/v1/admin/coupons`
+- `PATCH /api/v1/admin/coupons/:id`
+- `DELETE /api/v1/admin/coupons/:id`
+- `GET /api/v1/admin/coupons/analytics/summary`
 - `PATCH /api/v1/delivery/rider/availability`
 - `GET /health`
 
@@ -252,6 +259,18 @@ limit=10
 ```
 
 Invalid date ranges are rejected. Overview returns business cards such as revenue, order counts, active shops/riders, average order value, COD pending amount, online paid amount, and failed payment count. Revenue, orders, customers, shops, riders, and payments endpoints return breakdowns and chart-friendly trend arrays.
+
+## Coupons and Promotions
+
+Sprint-08 adds coupon validation, admin coupon management, usage tracking, and order integration.
+
+Supported discount types:
+
+- `FLAT`
+- `PERCENTAGE`
+- `FREE_DELIVERY`
+
+Coupons can target a city, shop, or category. They support expiry windows, active/disabled state, first-order-only rules, total usage limits, per-user limits, and minimum order value. During order creation the API accepts only `couponCode`; RedKS recalculates the discount server-side and records `CouponUsage` in the same transaction as the order.
 
 ## Payment Setup and Testing
 

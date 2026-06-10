@@ -22,6 +22,7 @@ import {
   paginationParams,
 } from '../../common/utils/api-response.util';
 import { AssignmentService } from '../assignment/assignment.service';
+import { CouponsService } from '../coupons/coupons.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CancelOrderDto } from './dto/cancel-order.dto';
@@ -35,6 +36,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly calculator: OrderCalculationService,
     private readonly assignmentService: AssignmentService,
+    private readonly couponsService?: CouponsService,
     private readonly notificationsService?: NotificationsService,
   ) {}
 
@@ -86,11 +88,28 @@ export class OrdersService {
       };
     });
 
+    const deliveryFee = Number(shop.zone.baseDeliveryFee ?? 0);
+    const subtotal = orderItems.reduce((total, item) => total + item.lineTotal, 0);
+    const couponResult = dto.couponCode
+      ? await this.couponsService?.validate({
+          code: dto.couponCode,
+          userId: customerId,
+          shopId: dto.shopId,
+          cityId: shop.cityId,
+          categoryIds: [...new Set(products.map((product) => product.categoryId))],
+          subtotal,
+          deliveryFee,
+        })
+      : null;
+    if (dto.couponCode && !couponResult) {
+      throw new BadRequestException('Coupon service is unavailable');
+    }
+
     const totals = this.calculator.calculate({
       items: orderItems,
-      deliveryFee: Number(shop.zone.baseDeliveryFee ?? 0),
+      deliveryFee: couponResult?.discountedDeliveryFee ?? deliveryFee,
       platformFee: 0,
-      discountAmount: 0,
+      discountAmount: couponResult?.payableSubtotalDiscount ?? 0,
       commissionPercent: Number(shop.defaultCommissionPercent),
     });
 
@@ -110,6 +129,7 @@ export class OrdersService {
             deliveryFee: totals.deliveryFee,
             platformFee: totals.platformFee,
             discountAmount: totals.discountAmount,
+            couponId: couponResult?.coupon.id,
             totalAmount: totals.totalAmount,
             commissionPercent: totals.commissionPercent,
             commissionAmount: totals.commissionAmount,
@@ -134,6 +154,15 @@ export class OrdersService {
           await tx.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } },
+          });
+        }
+
+        if (couponResult) {
+          await this.couponsService?.recordUsage(tx, {
+            couponId: couponResult.coupon.id,
+            userId: customerId,
+            orderId: order.id,
+            discountAmount: couponResult.discountAmount,
           });
         }
 
@@ -669,6 +698,8 @@ export class OrdersService {
       items: true,
       delivery: true,
       payment: true,
+      coupon: true,
+      couponUsage: true,
     };
   }
 

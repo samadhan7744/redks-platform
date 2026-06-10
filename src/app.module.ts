@@ -7,6 +7,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { CitiesModule } from './modules/cities/cities.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { HealthModule } from './modules/health/health.module';
 import { ItemRequestsModule } from './modules/item-requests/item-requests.module';
@@ -51,6 +52,7 @@ import { RedisModule } from './redis/redis.module';
     AddressesModule,
     CitiesModule,
     ZonesModule,
+    CouponsModule,
     ShopsModule,
     CategoriesModule,
     ProductsModule,
